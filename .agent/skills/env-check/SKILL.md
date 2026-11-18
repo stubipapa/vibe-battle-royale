@@ -17,12 +17,13 @@ description: >-
    - `git config --global user.name`
    - `git config --global user.email`
 
-2. **GitHub CLI 與登入驗證**（推送分支與發起 PR 建議使用）：
+2. **GitHub CLI 與登入驗證**（推送分支與發起 PR 必備）：
    - `gh --version`
    - `gh auth status`
+   - 提醒確認是否已執行過 `gh auth setup-git`（確保 `git push` HTTPS 可直接使用 `gh` 帳號憑證）。
 
 3. **本地靜態測試與語法檢查套件**（課堂練習模式預覽與 ES6 語法驗證必備）：
-   - `python3 --version`（用於啟動 `python3 -m http.server 8080` 本地預覽，解決 ES6 Module 無法用 `file://` 開啟的問題）
+   - `python3 --version`（Windows 若無 `python3`，改測 `python --version` 或 `py --version`，用於啟動本地 HTTP 伺服器解決 ES6 Module 無法用 `file://` 開啟的問題）
    - `node --version`（用於執行 `node --check <檔案>` 檢查 JavaScript 語法錯誤）
 
 ## 回報格式

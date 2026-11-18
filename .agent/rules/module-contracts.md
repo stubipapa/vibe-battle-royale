@@ -8,7 +8,7 @@
 
 - **必要匯出**：
   - `export const charactersConfig = [ ... ]`（必須包含 6 筆物件，對應 `id: 0 ~ 5`）
-  - `export function drawCharacter(ctx, player)`（於 `(player.x, player.y)` 繪製角色，主引擎已處理座標與 `player.angle` 或提供 `player.angle` 供旋轉繪圖）
+  - `export function drawCharacter(ctx, player)`（主引擎提供 `player.x, player.y, player.angle`，函式內須自行 `ctx.translate(player.x, player.y)` 與 `ctx.rotate(player.angle)` 繪製角色）
 - **物件必要屬性與護欄**：
   - `id` (`0 ~ 5`)、`name` (string)、`color` (string)
   - `hp` (number)：🛡️ **護欄 `60 ~ 160`**
@@ -35,8 +35,8 @@
 - **負責編號**：`attackId` `3, 4, 5`
 - **必要匯出**：
   - `export const specialAttacks = [ ... ]`（3 筆攻擊設定，含 `id`, `name`, `cooldown`, `color`）
-  - `export function onFireSpecial(attackId, shooter, spawnBullet)`（呼叫 `spawnBullet(...)` 生成子彈，可附帶 `spin`、`behavior` 等自訂屬性）
-  - `export function drawSpecialProjectile(ctx, bullet)`（自訂繪製奇葩攻擊圖案，如巨型西瓜、迴力尺、墨水陷阱）
+  - `export function onFireSpecial(attackId, shooter, spawnBullet)`（呼叫 `spawnBullet({ x, y, vx, vy, damage, lifeTime, visualRadius, hitRadius, color, style })` 生成子彈；主引擎僅保留這些標準欄位，旋轉或動畫效果請在 `drawSpecialProjectile` 內依 `bullet.style` 與 `performance.now()` 計算）
+  - `export function drawSpecialProjectile(ctx, bullet)`（自訂繪製奇葩攻擊圖案，如巨型西瓜、旋轉直尺、墨水球）
 - **護欄與鐵則**：
   - 🛡️ **鐵則：`hitRadius <= visualRadius`**，`visualRadius` 上限 **`36px`**（大型武器須搭配較低飛行速度）。
   - 🛡️ 單發傷害上限 **`45`**；冷卻 `cooldown` 範圍 **`800 ~ 2500` ms**。
@@ -69,8 +69,8 @@
 ## 模組 6：`config/rules.config.js`（學生 6：規則與結算 UI 師）
 
 - **必要匯出**：
-  - `export function drawHUD(ctx, gameState)`（繪製存活人數、倒數、盲盒角色／武器提示、擊殺播報等）
-  - `export function drawSpectatorOverlay(ctx, gameState)`（繪製淘汰後極簡觀戰提示與 `1~4` 表情互動面板）
+  - `export function drawHUD(ctx, gameState)`（`gameState` 提供 `{ mode, elapsedSec, aliveCount, totalCount, me }`，可繪製存活人數、經過時間、盲盒角色／武器與血量提示）
+  - `export function drawSpectatorOverlay(ctx, gameState)`（`gameState` 提供 `{ aliveCount, floatingEmojis }`，繪製淘汰後極簡觀戰提示與對應主引擎 `1:👍 2:🔥 3:🍉 4:😂` 的表情互動面板）
   - `export function drawGameOverScreen(ctx, ranking)`（繪製最後生存者吃雞頒獎台與排名結算畫面）
 - **護欄**：
   - 🛡️ HUD 與觀戰面板**不得遮擋畫面中央直徑 `450px` 的主交戰區**。

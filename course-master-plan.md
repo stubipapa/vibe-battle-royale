@@ -82,11 +82,14 @@
 
 ## 五、 學生端 Git 下載、開分支與 PR 審核流程 SOP
 
-1. **下載專案（含 `.agent` 規範與粗糙矩形原型）**
+> **教師課前提醒**：請先於 GitHub `stubipapa/vibe-battle-royale` 的 `Settings → Collaborators` 加入 6 位學生的 GitHub 帳號，學生才可直接推送分支。
+
+1. **環境檢查與下載專案（含 `.agent` 規範與粗糙矩形原型）**
    ```bash
-   git clone <教師 GitHub Repo 網址>
-   cd <專案資料夾>
+   cd ~/Desktop
+   git clone https://github.com/stubipapa/vibe-battle-royale.git
    ```
+   用 Antigravity IDE 開啟 `vibe-battle-royale` 資料夾後，可問 AI「`github 相關工具是否已經裝好？`」確認 `git`、`gh`（含 `gh auth setup-git`）、`python3`/`python` 與 `node`。
 2. **切換專屬分支**（避免 6 人衝突）
    - 學生 1：`git checkout -b feat/student-1-characters`
    - 學生 2：`git checkout -b feat/student-2-normal-attacks`
@@ -108,7 +111,7 @@
    ```
    至 GitHub Repo 點擊 `Compare & pull request` → `Create pull request`。
 5. **教師審核與 Vercel 上線**
-   - 教師使用本機 `pr-review` Skill 確認所有 PR 無誤後依序 Merge 至 `main` 分支。
+   - 教師使用 `teacher-pr-review` Skill 確認所有 PR 無誤後依序 Merge 至 `main` 分支。
    - Vercel 自動建置上線後，全班用筆電 Chrome 進入正式網址，切換至「連線」模式，等齊 6 人開打盲盒大逃殺！
 
 ---
@@ -120,7 +123,7 @@
 | **00–15 分** | 破冰與粗糙版展示 | 教師開「練習」與「連線」示範粗糙矩形原型；介紹 `.agent/` 規範。 | 為什麼 AI 協作需要「底層架構 + 介面契約」？ |
 | **15–25 分** | Git Clone 與開分支 | 學生認領 1～6 號、拉下專案開分支、跑起 `localhost:8080`。 | AI 開發環境與版本控制基礎。 |
 | **25–60 分** | Vibe Coding 創作 | 詢問 AI「我能設計什麼」（觸發分工 Skill），生成造型／武器／縮圈／道具／觀戰 UI 並於 Chrome 練習模式測試。 | 視覺化 Prompt 技巧、動態行為描述與數值邊界意識。 |
-| **60–75 分** | PR 審查與合併 | 學生推送分支開 PR；教師用 `pr-review` Skill 檢查並 Merge 至 `main`。 | AI 輔助 Code Review 與零衝突團隊協作。 |
+| **60–75 分** | PR 審查與合併 | 學生推送分支開 PR；教師用 `teacher-pr-review` Skill 檢查並 Merge 至 `main`。 | AI 輔助 Code Review 與零衝突團隊協作。 |
 | **75–90 分** | 6 人連線盲盒大亂鬥 | Vercel 上線後全班筆電 Chrome 滿 6 人開打，體驗盲盒抽籤與淘汰觀戰表情。 | 從粗糙原型到線上多人產品的完整敏捷閉環。 |
 
 ---
