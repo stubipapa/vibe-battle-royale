@@ -40,9 +40,15 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 18px;
-      padding: 24px;
+      gap: 14px;
+      padding: 20px;
       text-align: center;
+      overflow-y: auto;
+    }
+    @media (max-width: 600px) {
+      .overlay { justify-content: flex-start; gap: 10px; padding: 12px; }
+      .overlay h2 { font-size: 18px; }
+      button { padding: 10px 16px; font-size: 14px; }
     }
     .hidden { display: none !important; }
     .mode-btns { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
@@ -136,6 +142,9 @@
     import { getShrinkZone, drawArenaBackground, drawDangerZone } from './config/arena.config.js';
     import { itemsConfig, drawItem, applyItemEffect } from './modules/items.js';
     import { drawHUD, drawSpectatorOverlay, drawGameOverScreen } from './config/rules.config.js';
+
+    // 若 Playroom 出現每日共用配額上限，請至 https://dev.joinplayroom.com 免費建立專案並填入 gameId
+    const PLAYROOM_GAME_ID = '';
 
     const CANVAS_W = 800;
     const CANVAS_H = 600;
@@ -775,23 +784,34 @@
       btnOnline.disabled = true;
       btnPractice.disabled = true;
       appMode = 'online';
-      menuOverlay.classList.add('hidden');
-      lobbyOverlay.classList.remove('hidden');
-      btnBackMenu.classList.remove('hidden');
 
       try {
-        await window.Playroom.insertCoin({ skipLobby: false, maxPlayersPerRoom: 6 });
+        const coinOpts = { skipLobby: false, maxPlayersPerRoom: 6 };
+        const urlGameId = new URLSearchParams(window.location.search).get('gameId') || PLAYROOM_GAME_ID;
+        if (urlGameId) coinOpts.gameId = urlGameId;
+        await window.Playroom.insertCoin(coinOpts);
       } catch (err) {
         onlineStarting = false;
         appMode = null;
         btnOnline.disabled = false;
         btnPractice.disabled = false;
+        // 移除 Playroom 注入的配額／滿房遮罩，避免鎖死主選單與練習模式
+        document.getElementById('full-room-popup')?.remove();
         lobbyOverlay.classList.add('hidden');
         menuOverlay.classList.remove('hidden');
         btnBackMenu.classList.add('hidden');
-        alert(`無法加入房間（可能已滿 6 人或連線取消）：${err?.message || err}`);
+        const msg = String(err?.message || err || '');
+        if (msg.includes('QUOTA_EXCEEDED')) {
+          alert('Playroom 預設共用連線配額已達今日上限（QUOTA_EXCEEDED）。\n請教師於 dev.joinplayroom.com 取得免費專屬 gameId 填入 index.html，或先使用「練習模式」！');
+        } else {
+          alert(`無法加入房間（可能已滿 6 人或連線取消）：${msg}`);
+        }
         return;
       }
+
+      menuOverlay.classList.add('hidden');
+      lobbyOverlay.classList.remove('hidden');
+      btnBackMenu.classList.remove('hidden');
 
       // 紀錄進入大廳時若已有舊局 matchId，則忽略該舊局結算狀態
       const existingWorld = window.Playroom.getState('world');
