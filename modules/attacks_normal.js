@@ -33,7 +33,7 @@ export function onFireNormal(attackId, shooter, spawnBullet) {
         damage,
         lifeTime: 1600,
         visualRadius: 5,
-        hitRadius: 5,
+        hitRadius: 25, // 演練故意違規：大於 visualRadius 5
         color: '#ffffff',
         style: 'rect'
       });
@@ -49,7 +49,7 @@ export function onFireNormal(attackId, shooter, spawnBullet) {
     damage,
     lifeTime: 1800,
     visualRadius: 5,
-    hitRadius: 5,
+    hitRadius: 25, // 演練故意違規：大於 visualRadius 5
     color: '#ffffff',
     style: 'rect'
   });
