@@ -283,7 +283,7 @@
       if (!e.repeat && EMOJI_MAP[e.code]) {
         const myId = appMode === 'practice' ? 'local' : window.Playroom?.myPlayer()?.id;
         const me = world.players.find((p) => p.id === myId);
-        if (me && !me.alive && performance.now() - lastEmojiSentAt > 600) {
+        if (me && !me.alive && performance.now() - lastEmojiSentAt > 300) {
           lastEmojiSentAt = performance.now();
           const symbol = EMOJI_MAP[e.code];
           if (appMode === 'practice') {

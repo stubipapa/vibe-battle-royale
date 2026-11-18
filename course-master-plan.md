@@ -135,3 +135,7 @@
 - [x] 建立底層核心引擎 `index.html`（含練習／6人連線雙模式、`↑↓←→ + Z/X + Space`、盲盒隨機、Host 同步、Clamp 防呆）
 - [x] 建立 6 個「粗糙矩形原型」初始模組檔案
 - [x] 初始化 Git 儲存庫與 `.gitignore`，驗證 6 個模組語法並推送至 `stubipapa/vibe-battle-royale`
+- [x] 完成階段 A（[student-handout.md](file:///Users/jay/Documents/Ai課程202611/student-handout.md) 3 段 Subagent 逐段審查修正與總複驗）
+- [x] 完成階段 B（6 偵查員架構稽核 + `teacher-pr-review` PR #1 演練 + Vercel 正式站 `https://vibe-battle-royale.vercel.app/` 6 瀏覽器實測）
+- [ ] **【課前必做】**：至 [https://dev.joinplayroom.com](https://dev.joinplayroom.com) 免費註冊並建立專案取得專屬 `gameId`，填入 `index.html` 的 `PLAYROOM_GAME_ID` 後推送 `main`（實測確認 Playroom 未填 `gameId` 的預設共用池已觸發 `QUOTA_EXCEEDED`）
+- [ ] **【課前必做】**：於 GitHub `stubipapa/vibe-battle-royale` 的 `Settings → Collaborators` 邀請 6 位學生並請其點選 Accept Invitation
