@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>6人連線萬物大逃殺 - Vibe Coding 課堂版</title>
+  <script src="https://unpkg.com/playroomkit/multiplayer.full.umd.js" crossorigin="anonymous"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0f172a;
+      color: #f8fafc;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      gap: 12px;
+      padding: 16px;
+    }
+    h1 { font-size: 20px; letter-spacing: 0.5px; color: #fde047; }
+    .stage-wrap {
+      position: relative;
+      width: 800px;
+      height: 600px;
+      border: 3px solid #334155;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #1e293b;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+    }
+    canvas { display: block; width: 800px; height: 600px; }
+    .overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.92);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      padding: 24px;
+      text-align: center;
+    }
+    .hidden { display: none !important; }
+    .mode-btns { display: flex; gap: 16px; }
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 8px;
+      padding: 12px 24px;
+      font-size: 16px;
+      font-weight: 700;
+      transition: transform 0.1s, opacity 0.15s;
+    }
+    button:hover:not(:disabled) { transform: translateY(-1px); }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-practice { background: #22c55e; color: #052e16; }
+    .btn-online { background: #3b82f6; color: #eff6ff; }
+    .btn-secondary { background: #475569; color: #f8fafc; padding: 8px 16px; font-size: 14px; }
+    .controls-hint {
+      font-size: 13px;
+      color: #cbd5e1;
+      background: #1e293b;
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: 1px solid #334155;
+    }
+    .toolbar {
+      width: 800px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      color: #94a3b8;
+    }
+    .player-chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 560px; }
+    .chip {
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: #1e293b;
+      border: 1px solid #475569;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎮 6人連線萬物大逃殺（盲盒開局）</h1>
+
+  <div class="stage-wrap">
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+    <!-- 入口模式選擇畫面 -->
+    <div id="menuOverlay" class="overlay">
+      <h2>請選擇遊戲模式</h2>
+      <p style="color:#94a3b8;max-width:480px;line-height:1.6;">
+        開局前沒有人知道自己的角色、武器與道具功能！<br />
+        系統將於開戰瞬間隨機分配「盲盒組合」。
+      </p>
+      <div class="mode-btns">
+        <button id="btnPractice" class="btn-practice">🧪 練習模式（單人示範／測試）</button>
+        <button id="btnOnline" class="btn-online">🌐 連線模式（須滿 6 人開戰）</button>
+      </div>
+      <div class="controls-hint">
+        操作：<strong>↑ ↓ ← →</strong> 移動 ｜ <strong>Z / X</strong> 逆／順時針瞄準 ｜ <strong>Space</strong> 開火
+      </div>
+    </div>
+
+    <!-- 連線等待 6 人大廳 -->
+    <div id="lobbyOverlay" class="overlay hidden">
+      <h2 id="lobbyTitle">🌐 等待玩家加入中... (0 / 6)</h2>
+      <p style="color:#94a3b8;">連線模式必須等待 <strong>6 位玩家全部到齊</strong> 才能開始盲盒大逃殺！</p>
+      <div id="lobbyPlayers" class="player-chips"></div>
+      <button id="btnStartOnline" class="btn-online" disabled>等待 6 人到齊...</button>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="controls-hint">移動：↑ ↓ ← → ｜ 瞄準：Z / X ｜ 開火：Space ｜ 觀戰表情：1~4</div>
+    <div style="display:flex;gap:8px;">
+      <button id="btnReroll" class="btn-secondary hidden">🎲 重新隨機盲盒</button>
+      <button id="btnBackMenu" class="btn-secondary hidden">↩ 返回選單</button>
+    </div>
+  </div>
+
+  <script type="module">
+    import { charactersConfig, drawCharacter } from './config/characters.config.js';
+    import { normalAttacks, onFireNormal, drawNormalProjectile } from './modules/attacks_normal.js';
+    import { specialAttacks, onFireSpecial, drawSpecialProjectile } from './modules/attacks_special.js';
+    import { getShrinkZone, drawArenaBackground, drawDangerZone } from './config/arena.config.js';
+    import { itemsConfig, drawItem, applyItemEffect } from './modules/items.js';
+    import { drawHUD, drawSpectatorOverlay, drawGameOverScreen } from './config/rules.config.js';
+
+    const CANVAS_W = 800;
+    const CANVAS_H = 600;
+    const PLAYER_RADIUS = 16;
+    const ITEM_SPAWN_INTERVAL = 15; // 秒
+    const EMOJI_MAP = { Digit1: '👍', Digit2: '🔥', Digit3: '🍉', Digit4: '😂' };
+
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const menuOverlay = document.getElementById('menuOverlay');
+    const lobbyOverlay = document.getElementById('lobbyOverlay');
+    const lobbyTitle = document.getElementById('lobbyTitle');
+    const lobbyPlayersEl = document.getElementById('lobbyPlayers');
+    const btnStartOnline = document.getElementById('btnStartOnline');
+    const btnReroll = document.getElementById('btnReroll');
+    const btnBackMenu = document.getElementById('btnBackMenu');
+
+    const clamp = (val, min, max) => Math.min(max, Math.max(min, val));
+    const randInt = (n) => Math.floor(Math.random() * n);
+
+    // 取得經護欄夾限後的攻擊設定與角色設定
+    function getSafeChar(charId) {
+      const raw = charactersConfig[charId % charactersConfig.length] || charactersConfig[0];
+      return {
+        id: raw.id ?? 0,
+        name: String(raw.name || '未命名'),
+        color: raw.color || '#ffffff',
+        hp: clamp(Number(raw.hp) || 100, 60, 160),
+        speed: clamp(Number(raw.speed) || 3, 2, 5)
+      };
+    }
+
+    function getSafeAttack(attackId) {
+      const isSpecial = attackId >= 3;
+      const list = isSpecial ? specialAttacks : normalAttacks;
+      const raw = list.find((a) => a.id === attackId) || list[0];
+      const cooldown = isSpecial
+        ? clamp(Number(raw.cooldown) || 1200, 800, 2500)
+        : clamp(Number(raw.cooldown) || 500, 300, 1200);
+      return { id: attackId, isSpecial, name: String(raw.name || '基礎攻擊'), cooldown };
+    }
+
+    // 遊戲執行狀態
+    let appMode = null; // 'practice' | 'online'
+    let playroomPlayers = [];
+    let world = null;
+    let localEmojis = []; // 本機顯示的飄浮表情
+    let lastEmojiSentAt = 0;
+    let lastFrameTime = performance.now();
+    let loopRunning = false;
+
+    // 鍵盤狀態（僅允許方向鍵 + Z/X + Space + 觀戰 1~4）
+    const keys = new Set();
+    window.addEventListener('keydown', (e) => {
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
+        e.preventDefault();
+      }
+      keys.add(e.code);
+
+      // 淘汰觀戰表情快捷鍵 1~4
+      if (EMOJI_MAP[e.code] && world && world.phase === 'playing') {
+        const myId = appMode === 'practice' ? 'local' : window.Playroom?.myPlayer()?.id;
+        const me = world.players.find((p) => p.id === myId);
+        if (me && !me.alive && performance.now() - lastEmojiSentAt > 600) {
+          lastEmojiSentAt = performance.now();
+          const symbol = EMOJI_MAP[e.code];
+          if (appMode === 'practice') {
+            spawnFloatingEmoji(symbol, me.name);
+          } else {
+            window.Playroom.myPlayer().setState('emojiEvent', { symbol, name: me.name, ts: Date.now() });
+          }
+        }
+      }
+    });
+    window.addEventListener('keyup', (e) => keys.delete(e.code));
+
+    function spawnFloatingEmoji(symbol, senderName) {
+      localEmojis.push({
+        symbol,
+        senderName,
+        x: 160 + Math.random() * 480,
+        y: 520,
+        vy: -1.4,
+        life: 1800
+      });
+    }
+
+    // 建立初始世界（Host 或練習模式呼叫）
+    function createInitialWorld(participants) {
+      const total = participants.length;
+      const players = participants.map((part, idx) => {
+        const charId = randInt(charactersConfig.length);
+        const attackId = randInt(6);
+        const safeChar = getSafeChar(charId);
+        const angleToCenter = (Math.PI * 2 * idx) / total;
+        const spawnR = 220;
+        return {
+          id: part.id,
+          name: part.name,
+          isBot: Boolean(part.isBot),
+          charId,
+          charName: safeChar.name,
+          color: safeChar.color,
+          attackId,
+          attackName: getSafeAttack(attackId).name,
+          x: 400 + Math.cos(angleToCenter) * spawnR,
+          y: 300 + Math.sin(angleToCenter) * spawnR,
+          angle: angleToCenter + Math.PI,
+          hp: safeChar.hp,
+          maxHp: safeChar.hp,
+          baseSpeed: safeChar.speed,
+          speedMult: 1,
+          speedUntil: 0,
+          shieldUntil: 0,
+          lastFireAt: 0,
+          kills: 0,
+          alive: true,
+          eliminatedOrder: 0
+        };
+      });
+
+      return {
+        phase: 'playing', // 'playing' | 'gameover'
+        elapsedSec: 0,
+        nextItemAt: 5,
+        eliminatedCounter: 0,
+        players,
+        bullets: [],
+        items: [],
+        zone: { x: 400, y: 300, radius: 420, damagePerSec: 6 },
+        ranking: []
+      };
+    }
+
+    // 主引擎模擬步進（僅 Host 或練習模式執行）
+    function stepWorld(dtMs) {
+      if (!world || world.phase !== 'playing') return;
+      const dtSec = dtMs / 1000;
+      const now = performance.now();
+      world.elapsedSec += dtSec;
+
+      // 1. 縮圈計算與數值護欄
+      const rawZone = getShrinkZone(world.elapsedSec);
+      world.zone = {
+        x: clamp(Number(rawZone.x) || 400, 100, CANVAS_W - 100),
+        y: clamp(Number(rawZone.y) || 300, 100, CANVAS_H - 100),
+        radius: Math.max(70, Number(rawZone.radius) || 400),
+        damagePerSec: clamp(Number(rawZone.damagePerSec) || 6, 3, 12)
+      };
+
+      // 2. 道具定時生成（安全區內）
+      if (world.elapsedSec >= world.nextItemAt && world.items.length < 4) {
+        world.nextItemAt = world.elapsedSec + ITEM_SPAWN_INTERVAL;
+        const r = Math.random() * Math.max(20, world.zone.radius - 30);
+        const a = Math.random() * Math.PI * 2;
+        const cfg = itemsConfig[randInt(itemsConfig.length)] || { type: 'HEAL' };
+        world.items.push({
+          id: `${now}-${Math.random()}`,
+          x: clamp(world.zone.x + Math.cos(a) * r, 30, CANVAS_W - 30),
+          y: clamp(world.zone.y + Math.sin(a) * r, 30, CANVAS_H - 30),
+          type: cfg.type
+        });
+      }
+
+      // 3. 處理玩家移動、瞄準、開火與圈外扣血
+      for (const p of world.players) {
+        if (!p.alive) continue;
+
+        if (now > p.speedUntil) p.speedMult = 1;
+        p.isShielded = now < p.shieldUntil;
+
+        let dx = 0;
+        let dy = 0;
+        let turn = 0;
+        let firing = false;
+
+        if (p.isBot) {
+          // 練習模式標靶：緩慢繞圈
+          p.angle += 0.015;
+        } else {
+          const inp = appMode === 'practice'
+            ? readLocalInput()
+            : (playroomPlayers.find((pp) => pp.id === p.id)?.getState('input') || {});
+          dx = clamp(Number(inp.dx) || 0, -1, 1);
+          dy = clamp(Number(inp.dy) || 0, -1, 1);
+          turn = clamp(Number(inp.turn) || 0, -1, 1);
+          firing = Boolean(inp.firing);
+        }
+
+        const spd = p.baseSpeed * p.speedMult;
+        const len = Math.hypot(dx, dy) || 1;
+        if (dx !== 0 || dy !== 0) {
+          p.x = clamp(p.x + (dx / len) * spd, PLAYER_RADIUS, CANVAS_W - PLAYER_RADIUS);
+          p.y = clamp(p.y + (dy / len) * spd, PLAYER_RADIUS, CANVAS_H - PLAYER_RADIUS);
+        }
+        p.angle += turn * 0.075;
+
+        // 開火與數值護欄（含 hitRadius <= visualRadius 鐵則）
+        if (firing) {
+          const atk = getSafeAttack(p.attackId);
+          if (now - p.lastFireAt >= atk.cooldown) {
+            p.lastFireAt = now;
+            let shotTotalDamage = 0;
+            const spawnBullet = (b) => {
+              const maxVR = atk.isSpecial ? 36 : 20;
+              const visualRadius = clamp(Number(b.visualRadius) || 6, 2, maxVR);
+              const hitRadius = Math.min(visualRadius, clamp(Number(b.hitRadius) || visualRadius, 2, maxVR));
+              const maxSingleDmg = atk.isSpecial ? 45 : 35;
+              let dmg = clamp(Number(b.damage) || 10, 1, maxSingleDmg);
+              if (!atk.isSpecial) {
+                if (shotTotalDamage + dmg > 35) dmg = Math.max(0, 35 - shotTotalDamage);
+                shotTotalDamage += dmg;
+              }
+              if (dmg <= 0) return;
+
+              world.bullets.push({
+                ownerId: p.id,
+                isSpecial: atk.isSpecial,
+                x: Number(b.x) || p.x,
+                y: Number(b.y) || p.y,
+                vx: clamp(Number(b.vx) || 0, -14, 14),
+                vy: clamp(Number(b.vy) || 0, -14, 14),
+                damage: dmg,
+                lifeTime: clamp(Number(b.lifeTime) || 1500, 200, 5000),
+                visualRadius,
+                hitRadius,
+                color: b.color || '#ffffff',
+                style: b.style || 'rect'
+              });
+            };
+
+            if (atk.isSpecial) {
+              onFireSpecial(p.attackId, p, spawnBullet);
+            } else {
+              onFireNormal(p.attackId, p, spawnBullet);
+            }
+          }
+        }
+
+        // 圈外扣血
+        const distToZone = Math.hypot(p.x - world.zone.x, p.y - world.zone.y);
+        if (distToZone > world.zone.radius && !p.isShielded) {
+          p.hp -= world.zone.damagePerSec * dtSec;
+          if (p.hp <= 0) eliminatePlayer(p, null);
+        }
+      }
+
+      // 4. 更新子彈與碰撞判定
+      const nextBullets = [];
+      for (const b of world.bullets) {
+        b.x += b.vx;
+        b.y += b.vy;
+        b.lifeTime -= dtMs;
+        if (b.lifeTime <= 0 || b.x < -40 || b.x > CANVAS_W + 40 || b.y < -40 || b.y > CANVAS_H + 40) continue;
+
+        let hit = false;
+        for (const p of world.players) {
+          if (!p.alive || p.id === b.ownerId) continue;
+          if (Math.hypot(p.x - b.x, p.y - b.y) <= PLAYER_RADIUS + b.hitRadius) {
+            hit = true;
+            if (!p.isShielded) {
+              p.hp -= b.damage;
+              if (p.hp <= 0) eliminatePlayer(p, b.ownerId);
+            }
+            break;
+          }
+        }
+        if (!hit) nextBullets.push(b);
+      }
+      world.bullets = nextBullets;
+
+      // 5. 道具碰撞拾取與護欄
+      const nextItems = [];
+      for (const it of world.items) {
+        let picked = false;
+        for (const p of world.players) {
+          if (!p.alive || p.isBot) continue;
+          if (Math.hypot(p.x - it.x, p.y - it.y) <= PLAYER_RADIUS + 12) {
+            picked = true;
+            const eff = applyItemEffect(p, it.type) || {};
+            if (eff.heal) p.hp = Math.min(p.maxHp, p.hp + clamp(Number(eff.heal), 0, 50));
+            if (eff.shieldMs) p.shieldUntil = now + clamp(Number(eff.shieldMs), 0, 5000);
+            if (eff.speedMult && eff.speedMs) {
+              p.speedMult = clamp(Number(eff.speedMult), 1, 1.6);
+              p.speedUntil = now + clamp(Number(eff.speedMs), 0, 5000);
+            }
+            break;
+          }
+        }
+        if (!picked) nextItems.push(it);
+      }
+      world.items = nextItems;
+
+      // 6. 大逃殺勝負判定（最後 1 名存活者獲勝）
+      const alivePlayers = world.players.filter((p) => p.alive);
+      if (alivePlayers.length <= 1) {
+        world.phase = 'gameover';
+        world.ranking = [...world.players]
+          .sort((a, b) => {
+            if (a.alive !== b.alive) return a.alive ? -1 : 1;
+            return b.eliminatedOrder - a.eliminatedOrder;
+          })
+          .map((p, idx) => ({
+            name: p.name,
+            charName: p.charName,
+            kills: p.kills,
+            alive: p.alive,
+            rank: idx + 1
+          }));
+      }
+    }
+
+    function eliminatePlayer(victim, killerId) {
+      victim.hp = 0;
+      victim.alive = false;
+      world.eliminatedCounter += 1;
+      victim.eliminatedOrder = world.eliminatedCounter;
+      if (killerId) {
+        const killer = world.players.find((p) => p.id === killerId);
+        if (killer) killer.kills += 1;
+      }
+    }
+
+    function readLocalInput() {
+      const dx = (keys.has('ArrowRight') ? 1 : 0) - (keys.has('ArrowLeft') ? 1 : 0);
+      const dy = (keys.has('ArrowDown') ? 1 : 0) - (keys.has('ArrowUp') ? 1 : 0);
+      const turn = (keys.has('KeyX') ? 1 : 0) - (keys.has('KeyZ') ? 1 : 0);
+      const firing = keys.has('Space');
+      return { dx, dy, turn, firing };
+    }
+
+    // 畫面渲染（每台筆電本機執行）
+    function render(dtMs) {
+      drawArenaBackground(ctx, CANVAS_W, CANVAS_H);
+      if (!world) return;
+
+      drawDangerZone(ctx, world.zone, CANVAS_W, CANVAS_H);
+
+      for (const it of world.items) {
+        drawItem(ctx, it);
+      }
+
+      for (const p of world.players) {
+        if (!p.alive) continue;
+        drawCharacter(ctx, p);
+        // 極簡頭頂血條與名稱
+        ctx.save();
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(p.x - 18, p.y - 28, 36, 5);
+        ctx.fillStyle = p.isShielded ? '#38bdf8' : '#22c55e';
+        ctx.fillRect(p.x - 18, p.y - 28, 36 * clamp(p.hp / p.maxHp, 0, 1), 5);
+        ctx.fillStyle = '#e2e8f0';
+        ctx.font = '11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(p.name, p.x, p.y - 32);
+        ctx.restore();
+      }
+
+      for (const b of world.bullets) {
+        if (b.isSpecial) drawSpecialProjectile(ctx, b);
+        else drawNormalProjectile(ctx, b);
+      }
+
+      // 飄浮加油表情
+      localEmojis = localEmojis.filter((em) => {
+        em.y += em.vy;
+        em.life -= dtMs;
+        if (em.life <= 0) return false;
+        ctx.save();
+        ctx.globalAlpha = Math.min(1, em.life / 600);
+        ctx.font = '26px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(em.symbol, em.x, em.y);
+        ctx.font = '11px sans-serif';
+        ctx.fillStyle = '#fde047';
+        ctx.fillText(em.senderName, em.x, em.y + 14);
+        ctx.restore();
+        return true;
+      });
+
+      const myId = appMode === 'practice' ? 'local' : window.Playroom?.myPlayer()?.id;
+      const me = world.players.find((p) => p.id === myId);
+      const aliveCount = world.players.filter((p) => p.alive).length;
+
+      drawHUD(ctx, {
+        mode: appMode,
+        elapsedSec: world.elapsedSec,
+        aliveCount,
+        totalCount: world.players.length,
+        me
+      });
+
+      if (world.phase === 'playing' && me && !me.alive) {
+        drawSpectatorOverlay(ctx, { aliveCount, floatingEmojis: localEmojis });
+      }
+      if (world.phase === 'gameover') {
+        drawGameOverScreen(ctx, world.ranking);
+      }
+    }
+
+    // 60 FPS 主迴圈
+    let lastEmojiSyncMap = new Map();
+    function gameLoop(now) {
+      const dtMs = Math.min(50, now - lastFrameTime);
+      lastFrameTime = now;
+
+      if (appMode === 'practice') {
+        stepWorld(dtMs);
+      } else if (appMode === 'online' && window.Playroom) {
+        const myP = window.Playroom.myPlayer();
+        if (myP) myP.setState('input', readLocalInput());
+
+        // 同步各玩家送出的加油表情
+        for (const pp of playroomPlayers) {
+          const ev = pp.getState('emojiEvent');
+          if (ev && ev.ts !== lastEmojiSyncMap.get(pp.id)) {
+            lastEmojiSyncMap.set(pp.id, ev.ts);
+            spawnFloatingEmoji(ev.symbol, ev.name || '玩家');
+          }
+        }
+
+        if (window.Playroom.isHost()) {
+          if (world) {
+            stepWorld(dtMs);
+            window.Playroom.setState('world', world);
+          }
+        } else {
+          const synced = window.Playroom.getState('world');
+          if (synced) world = synced;
+        }
+      }
+
+      render(dtMs);
+      if (loopRunning) requestAnimationFrame(gameLoop);
+    }
+
+    // 啟動練習模式
+    function startPractice() {
+      appMode = 'practice';
+      menuOverlay.classList.add('hidden');
+      lobbyOverlay.classList.add('hidden');
+      btnReroll.classList.remove('hidden');
+      btnBackMenu.classList.remove('hidden');
+
+      world = createInitialWorld([
+        { id: 'local', name: '我（教師／學生）', isBot: false },
+        { id: 'bot-1', name: '標靶 A', isBot: true },
+        { id: 'bot-2', name: '標靶 B', isBot: true }
+      ]);
+
+      if (!loopRunning) {
+        loopRunning = true;
+        lastFrameTime = performance.now();
+        requestAnimationFrame(gameLoop);
+      }
+    }
+
+    // 啟動 6 人連線模式
+    async function startOnline() {
+      if (!window.Playroom) {
+        alert('Playroom SDK 尚未載入完成，請確認網路連線。');
+        return;
+      }
+      appMode = 'online';
+      menuOverlay.classList.add('hidden');
+      lobbyOverlay.classList.remove('hidden');
+      btnBackMenu.classList.remove('hidden');
+
+      await window.Playroom.insertCoin({ skipLobby: false });
+
+      window.Playroom.onPlayerJoin((player) => {
+        playroomPlayers.push(player);
+        updateLobbyUI();
+        player.onQuit(() => {
+          playroomPlayers = playroomPlayers.filter((p) => p.id !== player.id);
+          updateLobbyUI();
+        });
+      });
+
+      // 等待 Host 廣播開局
+      const waitLobby = () => {
+        if (appMode !== 'online') return;
+        const synced = window.Playroom.getState('world');
+        if (synced && synced.phase) {
+          world = synced;
+          lobbyOverlay.classList.add('hidden');
+          if (!loopRunning) {
+            loopRunning = true;
+            lastFrameTime = performance.now();
+            requestAnimationFrame(gameLoop);
+          }
+          return;
+        }
+        updateLobbyUI();
+        requestAnimationFrame(waitLobby);
+      };
+      requestAnimationFrame(waitLobby);
+    }
+
+    function updateLobbyUI() {
+      const count = playroomPlayers.length;
+      lobbyTitle.textContent = `🌐 等待玩家加入中... (${count} / 6)`;
+      lobbyPlayersEl.innerHTML = playroomPlayers
+        .map((p, i) => `<span class="chip">玩家 ${i + 1}: ${p.getProfile()?.name || '神秘挑戰者'}</span>`)
+        .join('');
+
+      const isHost = window.Playroom?.isHost();
+      const full = count >= 6;
+      btnStartOnline.disabled = !(isHost && full);
+      if (!full) btnStartOnline.textContent = `還差 ${6 - count} 位玩家才能開始...`;
+      else if (!isHost) btnStartOnline.textContent = '已滿 6 人！等待房主點擊開始...';
+      else btnStartOnline.textContent = '🚀 6 人已到齊！啟動盲盒大逃殺';
+    }
+
+    btnStartOnline.addEventListener('click', () => {
+      if (window.Playroom?.isHost() && playroomPlayers.length >= 6) {
+        const participants = playroomPlayers.slice(0, 6).map((p, idx) => ({
+          id: p.id,
+          name: p.getProfile()?.name || `玩家${idx + 1}`,
+          isBot: false
+        }));
+        world = createInitialWorld(participants);
+        window.Playroom.setState('world', world);
+      }
+    });
+
+    document.getElementById('btnPractice').addEventListener('click', startPractice);
+    document.getElementById('btnOnline').addEventListener('click', startOnline);
+    btnReroll.addEventListener('click', startPractice);
+    btnBackMenu.addEventListener('click', () => window.location.reload());
+  </script>
+</body>
+</html>
