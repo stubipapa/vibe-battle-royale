@@ -1,4 +1,4 @@
-# 6 大外掛模組介面契約與數值護欄
+# 外掛模組介面契約與數值護欄（5 位實作學生版）
 
 所有模組必須使用原生 ES6 `export` 語法匯出，供 `index.html` 主引擎載入。主引擎載入時會對所有數值執行 `Math.min / Math.max` 強制夾限（Clamp），請務必在規範範圍內設計。
 
@@ -7,7 +7,7 @@
 ## 模組 1：`config/characters.config.js`（學生 1：角色外觀與體質師）
 
 - **必要匯出**：
-  - `export const charactersConfig = [ ... ]`（必須包含 6 筆物件，對應 `id: 0 ~ 5`）
+  - `export const charactersConfig = [ ... ]`（包含 `5 ~ 6` 筆物件，對應 `id: 0 ~ 4` 或 `0 ~ 5`）
   - `export function drawCharacter(ctx, player)`（主引擎提供 `player.x, player.y, player.angle`，函式內須自行 `ctx.translate(player.x, player.y)` 與 `ctx.rotate(player.angle)` 繪製角色）
 - **物件必要屬性與護欄**：
   - `id` (`0 ~ 5`)、`name` (string)、`color` (string)
@@ -55,7 +55,7 @@
 
 ---
 
-## 模組 5：`modules/items.js`（學生 5：戰場道具師）
+## 模組 5：`modules/items.js`（學生 5：戰場道具與決戰特效師）
 
 - **必要匯出**：
   - `export const itemsConfig = [ ... ]`（建議 3～4 種道具類型，如 `'HEAL'`, `'SHIELD'`, `'SPEED'`）
@@ -66,12 +66,11 @@
 
 ---
 
-## 模組 6：`config/rules.config.js`（學生 6：規則與結算 UI 師）
+## 附屬預設模組：`config/rules.config.js`（教師預設內建／學生 5 可選配美化）
 
 - **必要匯出**：
-  - `export function drawHUD(ctx, gameState)`（`gameState` 提供 `{ mode, elapsedSec, aliveCount, totalCount, me }`，可繪製存活人數、經過時間、盲盒角色／武器與血量提示）
-  - `export function drawSpectatorOverlay(ctx, gameState)`（`gameState` 提供 `{ aliveCount, floatingEmojis }`，繪製淘汰後極簡觀戰提示與對應主引擎 `1:👍 2:🔥 3:🍉 4:😂` 的表情互動面板）
+  - `export function drawHUD(ctx, gameState)`（`gameState` 提供 `{ mode, elapsedSec, aliveCount, totalCount, me }`）
+  - `export function drawSpectatorOverlay(ctx, gameState)`（`gameState` 提供 `{ aliveCount, floatingEmojis }`，對應主引擎 `1:👍 2:🔥 3:🍉 4:😂` 的表情互動面板）
   - `export function drawGameOverScreen(ctx, ranking)`（繪製最後生存者吃雞頒獎台與排名結算畫面）
 - **護欄**：
-  - 🛡️ HUD 與觀戰面板**不得遮擋畫面中央直徑 `450px` 的主交戰區**。
-  - 🛡️ 自訂額外快捷鍵（例如觀戰表情鍵）扣除固定操作鍵後，**最多不超過 3 種**（若使用 `1~4` 表情可共用一個觸發機制或維持簡潔）。
+  - 🛡️ HUD 與觀戰面板**不得遮擋畫面中央直徑 `450px` 的主交戰區**；自訂額外快捷鍵扣除固定操作鍵後**最多不超過 3 種**。

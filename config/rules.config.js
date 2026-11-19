@@ -1,7 +1,7 @@
 /**
- * 模組 6：規則與結算 UI 師（學生 6 負責）
+ * 模組 6（教師預設提供／學生 5 可選配美化）：大逃殺規則與結算 UI
  * --------------------------------------------------
- * 目前為「純白字 HUD + 黑底白字結算」樣板，請設計吃雞頒獎台、存活 HUD 與淘汰觀戰表情面板！
+ * 目前為基礎 HUD + 觀戰提示 + 結算畫面，確保 5 人專案開箱即用；學生 5 若完成道具亦可選配美化此檔！
  * 護欄限制：HUD 不可遮擋畫面中央直徑 450px 主交戰區；額外自訂按鍵不超過 3 種。
  */
 
@@ -15,7 +15,7 @@ export function drawHUD(ctx, gameState) {
   ctx.fillStyle = '#ffffff';
   ctx.font = 'bold 14px monospace';
   ctx.textAlign = 'left';
-  const modeLabel = gameState.mode === 'practice' ? '練習模式' : '6人連線';
+  const modeLabel = gameState.mode === 'practice' ? '練習模式' : '5人連線';
   ctx.fillText(`[${modeLabel}] 存活: ${gameState.aliveCount}/${gameState.totalCount} | 時間: ${Math.floor(gameState.elapsedSec)}s`, 14, 24);
 
   if (gameState.me) {
@@ -27,7 +27,7 @@ export function drawHUD(ctx, gameState) {
 }
 
 /**
- * 繪製淘汰後極簡觀戰畫面與加油表情提示（由學生 6 自由美化）
+ * 繪製淘汰後極簡觀戰畫面與加油表情提示（由學生 5 選配美化）
  * @param {CanvasRenderingContext2D} ctx
  * @param {object} gameState - { aliveCount, floatingEmojis }
  */
