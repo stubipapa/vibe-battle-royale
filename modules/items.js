@@ -1,14 +1,14 @@
 /**
  * 模組 5：戰場道具師（學生 5 負責）
  * --------------------------------------------------
- * 美化神秘問號空投箱外觀，並進行數值違規暴力測試。
+ * 神秘問號空投箱外觀與多樣盲盒 Buff（已修正至合規護欄數值）。
  * 護欄限制：回血 <= 50 HP、加速倍率 <= 1.6x、Buff 持續時間 <= 5000ms。
  */
 
 export const itemsConfig = [
-  { type: 'HEAL', label: '超載醫療箱 +200', color: '#f43f5e' },
-  { type: 'SHIELD', label: '永恆護盾 20秒', color: '#38bdf8' },
-  { type: 'SPEED', label: '極速推進 4.0x', color: '#4ade80' }
+  { type: 'HEAL', label: '神秘急救箱 +50', color: '#f43f5e' },
+  { type: 'SHIELD', label: '金鐘護盾 5秒', color: '#38bdf8' },
+  { type: 'SPEED', label: '極速推進 1.6x', color: '#4ade80' }
 ];
 
 /**
@@ -70,17 +70,17 @@ export function drawItem(ctx, item) {
 }
 
 /**
- * 玩家撿取道具後觸發的 Buff 效果（含故意違規測試數值）
+ * 玩家撿取道具後觸發的 Buff 效果（符合護欄上限，交由主引擎安全套用並計時還原）
  * @param {object} player
  * @param {string} itemType
  * @returns {{ heal?: number, shieldMs?: number, speedMult?: number, speedMs?: number, label?: string }}
  */
 export function applyItemEffect(player, itemType) {
   if (itemType === 'SHIELD') {
-    return { shieldMs: 20000, label: '獲得超規護盾 20 秒！' };
+    return { shieldMs: 5000, label: '獲得金鐘護盾 5 秒！' };
   }
   if (itemType === 'SPEED') {
-    return { speedMult: 4.0, speedMs: 3000, label: '移動極速 4.0x 加速！' };
+    return { speedMult: 1.6, speedMs: 5000, label: '移動極速 1.6x（5 秒）！' };
   }
-  return { heal: 200, label: '生命暴衝回復 +200！' };
+  return { heal: 50, label: '神秘急救回復 +50！' };
 }
