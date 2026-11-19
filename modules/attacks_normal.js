@@ -2,7 +2,7 @@
  * 模組 2：常規攻擊形式師（學生 2 負責，負責 attackId: 0, 1, 2）
  * --------------------------------------------------
  * 設計：0 噴彩虹、1 橡皮擦屑散彈、2 筆芯連射
- * [演練故意違規測試]：故意寫入 visualRadius: 10, hitRadius: 45, damage: 80
+ * 護欄：hitRadius <= visualRadius（上限 20px）、單次開火總傷害 <= 35、冷卻 300~1200ms
  */
 
 export const normalAttacks = [
@@ -19,7 +19,7 @@ export const normalAttacks = [
  */
 export function onFireNormal(attackId, shooter, spawnBullet) {
   if (attackId === 1) {
-    // 1: 散彈（3 發扇形散射）
+    // 1: 散彈（3 發扇形散射，單次總傷害 11 * 3 = 33 <= 35）
     const speed = 7;
     [-0.22, 0, 0.22].forEach((offset) => {
       const a = shooter.angle + offset;
@@ -28,10 +28,10 @@ export function onFireNormal(attackId, shooter, spawnBullet) {
         y: shooter.y + Math.sin(a) * 22,
         vx: Math.cos(a) * speed,
         vy: Math.sin(a) * speed,
-        damage: 80, // 故意違規：超過 35 上限
+        damage: 11,
         lifeTime: 1400,
-        visualRadius: 10,
-        hitRadius: 45, // 故意違規：hitRadius > visualRadius 且超過 20px 上限
+        visualRadius: 6,
+        hitRadius: 6,
         color: '#f1f5f9',
         style: 'shotgun'
       });
@@ -40,34 +40,34 @@ export function onFireNormal(attackId, shooter, spawnBullet) {
   }
 
   if (attackId === 2) {
-    // 2: 筆芯（高速直射）
+    // 2: 筆芯（高速直射，傷害 18 <= 35）
     const speed = 10;
     spawnBullet({
       x: shooter.x + Math.cos(shooter.angle) * 22,
       y: shooter.y + Math.sin(shooter.angle) * 22,
       vx: Math.cos(shooter.angle) * speed,
       vy: Math.sin(shooter.angle) * speed,
-      damage: 80, // 故意違規：超過 35 上限
+      damage: 18,
       lifeTime: 1600,
-      visualRadius: 10,
-      hitRadius: 45, // 故意違規：hitRadius > visualRadius 且超過 20px 上限
+      visualRadius: 5,
+      hitRadius: 5,
       color: '#334155',
       style: 'lead'
     });
     return;
   }
 
-  // 0: 噴彩虹
+  // 0: 噴彩虹（傷害 24 <= 35）
   const speed = 6.5;
   spawnBullet({
     x: shooter.x + Math.cos(shooter.angle) * 22,
     y: shooter.y + Math.sin(shooter.angle) * 22,
     vx: Math.cos(shooter.angle) * speed,
     vy: Math.sin(shooter.angle) * speed,
-    damage: 80, // 故意違規：超過 35 上限
+    damage: 24,
     lifeTime: 1800,
     visualRadius: 10,
-    hitRadius: 45, // 故意違規：hitRadius > visualRadius 且超過 20px 上限
+    hitRadius: 10,
     color: '#ff4d6d',
     style: 'rainbow'
   });
