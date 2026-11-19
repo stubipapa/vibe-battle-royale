@@ -76,6 +76,18 @@
     .btn-practice { background: #22c55e; color: #052e16; }
     .btn-online { background: #3b82f6; color: #eff6ff; }
     .btn-secondary { background: #475569; color: #f8fafc; padding: 8px 16px; font-size: 14px; }
+    .btn-emergency {
+      background: rgba(245, 158, 11, 0.12);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.45);
+      padding: 7px 14px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .btn-emergency:hover:not(:disabled) {
+      background: rgba(245, 158, 11, 0.22);
+      border-color: #fbbf24;
+    }
     .controls-hint {
       font-size: 13px;
       color: #cbd5e1;
@@ -167,6 +179,7 @@
       <p style="color:#94a3b8;">連線模式由教師開房觀戰，須等待 <strong>6 位學生全部到齊</strong> 才能開始！</p>
       <div id="lobbyPlayers" class="player-chips"></div>
       <button id="btnStartOnline" class="btn-online" disabled>等待 6 位學生到齊...</button>
+      <button id="btnEmergencyStart" class="btn-emergency hidden" disabled>⚠️ 緊急以目前人數開戰</button>
     </div>
   </div>
 
@@ -223,6 +236,7 @@
     const btnJoinRoom = document.getElementById('btnJoinRoom');
     const btnCopyInvite = document.getElementById('btnCopyInvite');
     const btnStartOnline = document.getElementById('btnStartOnline');
+    const btnEmergencyStart = document.getElementById('btnEmergencyStart');
     const btnReroll = document.getElementById('btnReroll');
     const btnOnlineRestart = document.getElementById('btnOnlineRestart');
     const btnBackMenu = document.getElementById('btnBackMenu');
@@ -307,6 +321,7 @@
     let gameoverSynced = false;
     let lastFrameTime = performance.now();
     let loopRunning = false;
+    let isLaunchingMatch = false;
 
     // 預填預設暱稱與網址房號
     inputNickname.value = `挑戰者${Math.floor(10 + Math.random() * 89)}`;
@@ -605,7 +620,8 @@
       world.items = nextItems;
 
       const alivePlayers = world.players.filter((p) => p.alive);
-      if (alivePlayers.length <= 1) {
+      const gameOverAliveThreshold = world.players.length <= 1 ? 0 : 1;
+      if (alivePlayers.length <= gameOverAliveThreshold) {
         world.phase = 'gameover';
         const sorted = [...world.players].sort((a, b) => {
           if (a.alive !== b.alive) return a.alive ? -1 : 1;
@@ -722,6 +738,7 @@
         drawGameOverScreen(ctx, world.ranking || []);
         if (appMode === 'online' && isRoomHost) {
           btnOnlineRestart.classList.remove('hidden');
+          btnOnlineRestart.disabled = isLaunchingMatch || roomPlayers.length < 1;
         }
       }
     }
@@ -789,8 +806,10 @@
 
     // 練習模式
     function startPractice() {
+      document.activeElement?.blur();
       appMode = 'practice';
       keys.clear();
+      pendingFire = false;
       localEmojis = [];
       menuOverlay.classList.add('hidden');
       roomSetupOverlay.classList.add('hidden');
@@ -869,6 +888,8 @@
         // 更新網址方便複製分享
         history.replaceState(null, '', `${window.location.pathname}?room=${code}`);
         lobbyRoomCodeEl.textContent = code;
+        roomPlayers = [];
+        updateLobbyUI();
         roomSetupOverlay.classList.add('hidden');
         lobbyOverlay.classList.remove('hidden');
 
@@ -915,8 +936,10 @@
           const isNewMatch = synced.matchId !== lastObservedMatchId;
           if (isNewMatch || !world || synced.tick >= world.tick) {
             if (isNewMatch) {
+              document.activeElement?.blur();
               lastObservedMatchId = synced.matchId;
               keys.clear();
+              pendingFire = false;
               localEmojis = [];
               btnOnlineRestart.classList.add('hidden');
               lobbyOverlay.classList.add('hidden');
@@ -956,36 +979,59 @@
       });
 
       const full = count >= 6;
-      btnStartOnline.disabled = !(isRoomHost && full);
+      btnStartOnline.disabled = !(isRoomHost && full) || isLaunchingMatch;
       if (!full) btnStartOnline.textContent = `還差 ${6 - count} 位學生才能開始...`;
       else if (!isRoomHost) btnStartOnline.textContent = '已滿 6 位學生！等待老師點擊開始...';
       else btnStartOnline.textContent = '🚀 6 位學生已到齊！啟動盲盒大逃殺';
+
+      const showEmergency = isRoomHost && count >= 1 && count < 6;
+      btnEmergencyStart.classList.toggle('hidden', !showEmergency);
+      btnEmergencyStart.disabled = !showEmergency || isLaunchingMatch;
+      if (showEmergency) {
+        btnEmergencyStart.textContent = `⚠️ 緊急以目前人數開戰（${count} 人）`;
+      }
     }
 
-    async function launchOnlineMatch() {
-      if (!isRoomHost || roomPlayers.length < 6) return;
+    async function launchOnlineMatch({ allowPartial = false } = {}) {
+      if (isLaunchingMatch || !isRoomHost || !roomCode) return;
+      const minPlayers = allowPartial === true ? 1 : 6;
+      if (roomPlayers.length < minPlayers) return;
+
+      isLaunchingMatch = true;
+      document.activeElement?.blur();
       btnStartOnline.disabled = true;
+      btnEmergencyStart.disabled = true;
+      btnOnlineRestart.disabled = true;
       btnOnlineRestart.classList.add('hidden');
       keys.clear();
+      pendingFire = false;
       localEmojis = [];
       lastEmojiSyncMap.clear();
       gameoverSynced = false;
 
-      await set(ref(db, `rooms/${roomCode}/emojis`), null).catch(() => {});
-      const participants = roomPlayers.slice(0, 6).map((p, idx) => ({
-        id: p.id,
-        name: p.name || `玩家${idx + 1}`,
-        isBot: false
-      }));
-      world = createInitialWorld(participants);
-      lastObservedMatchId = world.matchId;
-      lobbyOverlay.classList.add('hidden');
-      await set(ref(db, `rooms/${roomCode}/world`), buildCompactWorld(world));
+      try {
+        await set(ref(db, `rooms/${roomCode}/emojis`), null).catch(() => {});
+        const participants = roomPlayers.slice(0, 6).map((p, idx) => ({
+          id: p.id,
+          name: p.name || `玩家${idx + 1}`,
+          isBot: false
+        }));
+        if (participants.length < minPlayers) return;
 
-      if (!loopRunning) {
-        loopRunning = true;
-        lastFrameTime = performance.now();
-        requestAnimationFrame(gameLoop);
+        world = createInitialWorld(participants);
+        lastObservedMatchId = world.matchId;
+        lobbyOverlay.classList.add('hidden');
+        await set(ref(db, `rooms/${roomCode}/world`), buildCompactWorld(world));
+
+        if (!loopRunning) {
+          loopRunning = true;
+          lastFrameTime = performance.now();
+          requestAnimationFrame(gameLoop);
+        }
+      } finally {
+        isLaunchingMatch = false;
+        btnOnlineRestart.disabled = false;
+        updateLobbyUI();
       }
     }
 
@@ -1016,8 +1062,9 @@
       }
     });
 
-    btnStartOnline.addEventListener('click', launchOnlineMatch);
-    btnOnlineRestart.addEventListener('click', launchOnlineMatch);
+    btnStartOnline.addEventListener('click', () => launchOnlineMatch({ allowPartial: false }));
+    btnEmergencyStart.addEventListener('click', () => launchOnlineMatch({ allowPartial: true }));
+    btnOnlineRestart.addEventListener('click', () => launchOnlineMatch({ allowPartial: true }));
     document.getElementById('btnPractice').addEventListener('click', startPractice);
     document.getElementById('btnOnline').addEventListener('click', openRoomSetup);
     btnReroll.addEventListener('click', startPractice);

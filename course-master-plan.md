@@ -27,10 +27,10 @@
 
 ## 二、 網路同步與主引擎雙重防呆設計
 
-### 1. Playroom SDK 輕量化原則（Host 權威模式）
-- **網路僅同步極簡數據**：玩家座標 `(x, y)`、角度 `angle`、血量 `hp`、存活狀態 `alive`、盲盒分配之 `charId` / `attackId`、子彈位置與 `type`、觀戰表情觸發事件。
+### 1. Firebase Realtime Database 輕量化原則（教師開房純觀戰 Host 權威模式）
+- **網路僅同步極簡數據（新加坡節點 `asia-southeast1`）**：學生端僅上傳操作輸入（`dx, dy, turn, firing`）與觀戰表情事件；教師 Host 端廣播精簡世界狀態（玩家座標 `(x, y)`、角度 `angle`、血量 `hp`、存活狀態 `alive`、盲盒角色與武器顯示資訊、子彈座標與 `visualRadius`/`style`、道具與縮圈資訊）。
 - **本機各自渲染視覺**：所有複雜圖形（水果外觀、彩虹粒子、西瓜旋轉等）一律在各台筆電的 Canvas 本機運算繪製。
-- **Host 單一真理來源**：回合秒數、安全區縮圈半徑、空投道具生成、子彈碰撞與扣血判定、勝負結算，統一由 Host 計算並廣播。
+- **教師開房純觀戰（Host 單一真理來源）**：教師開房擔任純觀戰轉播與權威主機（不佔 6 位學生參賽名額），回合秒數、安全區縮圈半徑、空投道具生成、子彈碰撞與扣血判定、勝負結算，統一由教師 Host 計算並廣播。
 
 ### 2. 雙重數值護欄（主引擎 Clamp + `.agent` 規範）
 - 主引擎 `index.html` 在載入學生模組時，會強制執行 `Math.min / Math.max` 夾限（Clamp）。
@@ -56,7 +56,7 @@
 
 ### 1. 分發給學生的專案內 `.agent/`（隨 Repo 下載自動生效）
 - **`AGENTS.md` + `.agent/rules/`**（永遠強制載入）：
-  - 鎖死技術棧（純 HTML5 Canvas + 原生 ES6 Modules + Playroom SDK）。
+  - 鎖死技術棧（純 HTML5 Canvas + 原生 ES6 Modules + Firebase Realtime Database 新加坡節點）。
   - 鎖死檔案權限邊界（嚴禁修改 `index.html` 與他人模組）。
   - 鎖死上述數值護欄、`hitRadius <= visualRadius`、以及「額外自訂按鍵不超過 3 種」。
 - **`.agent/skills/role-assignment/`（「分工」Skill）**：
