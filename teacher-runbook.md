@@ -42,7 +42,7 @@
   python3 --version   # Windows 若無則執行 python --version
   node --version
   ```
-- **方式 B（直接 Prompt 給 Antigravity）**：開啟 Antigravity IDE，複製貼上以下文字：
+- **方式 B（直接 Prompt 給 Antigravity 2.0）**：開啟 **Antigravity 2.0**，複製貼上以下文字：
   > 「請幫我在終端機檢查我的電腦是否具備下載 GitHub 專案與本地測試環境：`git --version`、`git config --global user.name`、`git config --global user.email`、`gh --version`、`gh auth status`、`python3 --version`（Windows 若無則測 `python --version`）、`node --version`。若有缺少任何項目或還沒設定 `gh auth setup-git`，請直接給我安裝或登入指令。」
 
 ### 步驟 2-2：把專案下載到桌面並用 Antigravity 開啟
@@ -54,7 +54,7 @@
 - **方式 B（直接 Prompt 給 Antigravity）**：
   > 「請幫我把 `https://github.com/stubipapa/vibe-battle-royale.git` 下載（`git clone`）到我的桌面 `~/Desktop/vibe-battle-royale`（如果桌面已有舊的同名資料夾請先提醒我）。」
 - **⚠️ 必做確認（關鍵！）**：
-  1. 下載完成後，請學生在 Antigravity IDE 點選 **Open Folder**，務必選到 **`vibe-battle-royale` 這一層資料夾**（不可開在外層 Desktop，否則 `.agent/` 規範不會載入）。
+  1. 下載完成後，請學生在 **Antigravity 2.0** 選取並開啟 **`vibe-battle-royale` 這一層資料夾**作為工作區（不可開在外層 Desktop，否則 `.agent/` 規範不會載入）。
   2. 開好資料夾後，可問 AI 一句：**「`github 相關工具是否已經裝好？`」**（測試專案內的 `env-check` Skill 已成功載入）。
 
 ---

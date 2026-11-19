@@ -25,8 +25,8 @@ cd ~/Desktop
 git clone https://github.com/stubipapa/vibe-battle-royale.git
 ```
 
-### 2. 用 Antigravity IDE 開啟專案資料夾
-- 在 Antigravity 點選 **Open Folder**，務必選到 **`vibe-battle-royale` 這一層資料夾**（不要開在外層 Desktop）。
+### 2. 用 Antigravity 2.0 開啟專案資料夾
+- 在 **Antigravity 2.0** 選取並開啟專案資料夾，務必選到 **`vibe-battle-royale` 這一層資料夾**作為工作區（不要開在外層 Desktop）。
 - 開啟後，專案內的 `.agent/` 規範就會自動生效！此時你可以問 AI **`github 相關工具是否已經裝好？`** 再雙重確認一次環境。
 
 ### 3. 在已開啟的專案視窗中，切換你的專屬分支（依編號擇一）

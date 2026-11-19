@@ -89,7 +89,7 @@
    cd ~/Desktop
    git clone https://github.com/stubipapa/vibe-battle-royale.git
    ```
-   用 Antigravity IDE 開啟 `vibe-battle-royale` 資料夾後，可問 AI「`github 相關工具是否已經裝好？`」確認 `git`、`gh`（含 `gh auth setup-git`）、`python3`/`python` 與 `node`。
+   用 **Antigravity 2.0** 開啟 `vibe-battle-royale` 資料夾作為工作區後，可問 AI「`github 相關工具是否已經裝好？`」確認 `git`、`gh`（含 `gh auth setup-git`）、`python3`/`python` 與 `node`。
 2. **切換專屬分支**（避免 6 人衝突）
    - 學生 1：`git checkout -b feat/student-1-characters`
    - 學生 2：`git checkout -b feat/student-2-normal-attacks`
