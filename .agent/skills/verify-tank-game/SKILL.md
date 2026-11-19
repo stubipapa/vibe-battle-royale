@@ -1,19 +1,32 @@
 ---
 name: verify-tank-game
 description: >-
-  Use this skill when verifying the Battle Royale game modules, checking ES6 syntax across config/ and modules/,
-  or previewing the static HTML5 Canvas game locally in Practice Mode.
+  Use this skill whenever a student asks to self-check compliance before pushing/PR
+  (e.g. "幫我檢查合不合規", "我可以推送了嗎？", "幫我檢查語法與範圍"),
+  or when verifying ES6 syntax and previewing the game locally in Practice Mode.
 ---
 
-# 萬物大逃殺本地驗證與預覽流程
+# 學生自我健檢與本地預覽流程
 
-## 驗證步驟
+當學生詢問「幫我檢查合不合規？」「我可以推送分支了嗎？」或準備本地驗證時，請執行以下**寬容且實用的自我健檢**（只把關紅線，不限制創意發揮，並主動給予優化建議）：
 
-1. **檢查檔案結構與語法**
-   - 執行 `node --check` 檢查 `config/*.js` 與 `modules/*.js` 是否有語法錯誤：
-     `for f in config/*.js modules/*.js; do node --check "$f"; done`
-   - 確認沒有混用 CommonJS `require()` 或未宣告的外部依賴。
+## 1. 上傳前合規自我健檢（5 項檢查）
 
-2. **啟動本地靜態伺服器於「練習模式」預覽**
-   - 由於專案使用原生 ES6 Modules（`<script type="module">`），不可直接以 `file://` 開啟 `index.html`。
-   - 執行 `python3 -m http.server 8080`，於 Chrome 開啟 `http://localhost:8080` 並點選 **「練習模式」** 測試角色、攻擊圖案與範圍、縮圈、道具與 UI 是否正常運作。
+1. **檔案邊界檢查**：執行 `git status -s`，確認**只修改了自己負責的那 1 個模組檔案**。
+   - 若誤改到 `index.html`、`.agent/` 或其他人檔案，提醒並協助用 `git checkout -- <誤改檔案>` 還原。
+2. **ES6 語法與純淨度檢查**：
+   - 執行 `node --check <目標檔案>` 確認無 `SyntaxError`。
+   - 確認沒有使用 `require()`、`module.exports` 或外部 npm 套件，且該模組必要的 `export` 名稱皆存在。
+3. **紅線數值與碰撞範圍檢查**（依 [module-contracts.md](../../rules/module-contracts.md)）：
+   - 學生 2、3 必查：`hitRadius <= visualRadius`，且未超過傷害與半徑上限。
+   - 學生 1、4、5、6：確認沒有超出各模組護欄上限（或未在中央 450px 戰場區畫出遮擋物）。
+4. **額外按鍵數量檢查**：若學生有新增自訂鍵盤監聽，確認扣除固定按鍵（`↑ ↓ ← →`、`Z`、`X`、`Space`）後 **≤ 3 種**。
+
+## 2. 回報格式與建設性建議（不限制太死）
+
+- **若全部合規**：明確告知 `✅ 自我健檢通過，可以安心推分支發起 PR！`，同時可給予 **1～2 個不強制的可選優化小建議**（例如：「造型已經很完整！若想讓手感更有特色，也可以試著微調不同角色的移動速度差異」）。
+- **若有違規**：清楚指出哪一行超出護欄（例如 `hitRadius` 大於 `visualRadius`），並直接幫學生修正或提供調整方向。
+
+## 3. 本地「練習模式」預覽步驟
+
+- 若學生想先看畫面效果，協助執行 `python3 -m http.server 8080`（Windows 若無則試 `python` / `py`），引導在 Chrome 開啟 `http://localhost:8080` 點選 **「🧪 練習模式」** 測試（提醒修改後按 `Cmd+Shift+R` / `Ctrl+Shift+R` 強制重整）。
