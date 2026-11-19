@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>6人連線萬物大逃殺 - Vibe Coding 課堂版</title>
-  <script src="https://unpkg.com/playroomkit/multiplayer.full.umd.js" crossorigin="anonymous"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -35,7 +34,7 @@
     .overlay {
       position: absolute;
       inset: 0;
-      background: rgba(15, 23, 42, 0.92);
+      background: rgba(15, 23, 42, 0.94);
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -51,13 +50,24 @@
       button { padding: 10px 16px; font-size: 14px; }
     }
     .hidden { display: none !important; }
-    .mode-btns { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
+    .mode-btns { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; align-items: center; }
+    input {
+      background: #0f172a;
+      color: #f8fafc;
+      border: 1px solid #475569;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 15px;
+      outline: none;
+    }
+    input:focus { border-color: #3b82f6; }
     button {
       cursor: pointer;
       border: none;
       border-radius: 8px;
-      padding: 12px 24px;
-      font-size: 16px;
+      padding: 12px 22px;
+      font-size: 15px;
       font-weight: 700;
       transition: transform 0.1s, opacity 0.15s;
     }
@@ -70,7 +80,7 @@
       font-size: 13px;
       color: #cbd5e1;
       background: #1e293b;
-      padding: 8px 16px;
+      padding: 8px 14px;
       border-radius: 6px;
       border: 1px solid #334155;
     }
@@ -85,13 +95,24 @@
       font-size: 13px;
       color: #94a3b8;
     }
-    .player-chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 560px; }
+    .player-chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 580px; }
     .chip {
       padding: 6px 12px;
       border-radius: 999px;
       background: #1e293b;
       border: 1px solid #475569;
       font-size: 13px;
+    }
+    .chip-host { border-color: #facc15; color: #fde047; }
+    .room-badge {
+      font-family: monospace;
+      font-size: 18px;
+      font-weight: 700;
+      color: #38bdf8;
+      background: #0f172a;
+      padding: 6px 14px;
+      border-radius: 8px;
+      border: 1px solid #38bdf8;
     }
   </style>
 </head>
@@ -117,8 +138,30 @@
       </div>
     </div>
 
+    <!-- 連線模式：建立或加入房間 -->
+    <div id="roomSetupOverlay" class="overlay hidden">
+      <h2>🌐 6 人連線模式（Firebase 即時同步）</h2>
+      <div class="row">
+        <label for="inputNickname" style="color:#cbd5e1;">你的暱稱：</label>
+        <input id="inputNickname" type="text" maxlength="14" placeholder="請輸入暱稱" />
+      </div>
+      <div class="mode-btns">
+        <button id="btnCreateRoom" class="btn-online">🏠 房主建立新房間</button>
+      </div>
+      <div class="row" style="margin-top:4px;">
+        <input id="inputRoomCode" type="text" maxlength="10" placeholder="輸入 6 碼房號" style="width:150px;text-transform:uppercase;" />
+        <button id="btnJoinRoom" class="btn-practice">🚪 加入房間</button>
+      </div>
+      <p id="roomErrorMsg" style="color:#f87171;font-size:13px;min-height:18px;"></p>
+    </div>
+
     <!-- 連線等待 6 人大廳 -->
     <div id="lobbyOverlay" class="overlay hidden">
+      <div class="row">
+        <span>房號：</span>
+        <span id="lobbyRoomCode" class="room-badge">------</span>
+        <button id="btnCopyInvite" class="btn-secondary">📋 複製邀請連結</button>
+      </div>
       <h2 id="lobbyTitle">🌐 等待玩家加入中... (0 / 6)</h2>
       <p style="color:#94a3b8;">連線模式必須等待 <strong>6 位玩家全部到齊</strong> 才能開始盲盒大逃殺！</p>
       <div id="lobbyPlayers" class="player-chips"></div>
@@ -136,6 +179,8 @@
   </div>
 
   <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
+    import { getDatabase, ref, set, get, onValue, remove, onDisconnect } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js';
     import { charactersConfig, drawCharacter } from './config/characters.config.js';
     import { normalAttacks, onFireNormal, drawNormalProjectile } from './modules/attacks_normal.js';
     import { specialAttacks, onFireSpecial, drawSpecialProjectile } from './modules/attacks_special.js';
@@ -143,8 +188,9 @@
     import { itemsConfig, drawItem, applyItemEffect } from './modules/items.js';
     import { drawHUD, drawSpectatorOverlay, drawGameOverScreen } from './config/rules.config.js';
 
-    // 若 Playroom 出現每日共用配額上限，請至 https://dev.joinplayroom.com 免費建立專案並填入 gameId
-    const PLAYROOM_GAME_ID = '';
+    const FIREBASE_DB_URL = 'https://vibe-battle-royale-default-rtdb.asia-southeast1.firebasedatabase.app';
+    const firebaseApp = initializeApp({ databaseURL: FIREBASE_DB_URL });
+    const db = getDatabase(firebaseApp);
 
     const CANVAS_W = 800;
     const CANVAS_H = 600;
@@ -152,7 +198,7 @@
     const ITEM_SPAWN_INTERVAL = 15;
     const MAX_BULLETS_IN_WORLD = 180;
     const MAX_BULLETS_PER_SHOT = 8;
-    const SYNC_INTERVAL_MS = 40; // ~25Hz 同步節流
+    const SYNC_INTERVAL_MS = 50; // 20Hz 雲端同步節流
     const EMOJI_MAP = {
       Digit1: '👍', Numpad1: '👍',
       Digit2: '🔥', Numpad2: '🔥',
@@ -163,11 +209,17 @@
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const menuOverlay = document.getElementById('menuOverlay');
+    const roomSetupOverlay = document.getElementById('roomSetupOverlay');
     const lobbyOverlay = document.getElementById('lobbyOverlay');
+    const inputNickname = document.getElementById('inputNickname');
+    const inputRoomCode = document.getElementById('inputRoomCode');
+    const roomErrorMsg = document.getElementById('roomErrorMsg');
+    const lobbyRoomCodeEl = document.getElementById('lobbyRoomCode');
     const lobbyTitle = document.getElementById('lobbyTitle');
     const lobbyPlayersEl = document.getElementById('lobbyPlayers');
-    const btnPractice = document.getElementById('btnPractice');
-    const btnOnline = document.getElementById('btnOnline');
+    const btnCreateRoom = document.getElementById('btnCreateRoom');
+    const btnJoinRoom = document.getElementById('btnJoinRoom');
+    const btnCopyInvite = document.getElementById('btnCopyInvite');
     const btnStartOnline = document.getElementById('btnStartOnline');
     const btnReroll = document.getElementById('btnReroll');
     const btnOnlineRestart = document.getElementById('btnOnlineRestart');
@@ -230,18 +282,22 @@
         || pool[0];
     }
 
-    // 狀態變數
+    // 連線與遊戲狀態
+    const myPlayerId = `p-${Math.random().toString(36).slice(2, 8)}-${Date.now().toString(36).slice(-4)}`;
     let appMode = null; // 'practice' | 'online'
-    let onlineStarting = false;
-    let joinListenerBound = false;
-    let playroomPlayers = [];
+    let roomCode = '';
+    let isRoomHost = false;
+    let roomHostId = '';
+    let roomPlayers = []; // [{ id, name, joinedAt }]
+    let remoteInputs = {}; // { [playerId]: { dx, dy, turn, firing } }
+    let unsubscribers = [];
     let world = null;
     let localEmojis = [];
     let lastEmojiSentAt = 0;
     let myEmojiSeq = 0;
     let lastEmojiSyncMap = new Map();
     let lastObservedMatchId = null;
-    let lastLobbySnapshot = '';
+    let staleMatchId = null;
     let lastInputSent = '';
     let lastInputSentAt = 0;
     let lastWorldSyncAt = 0;
@@ -249,7 +305,15 @@
     let lastFrameTime = performance.now();
     let loopRunning = false;
 
-    // 鍵盤狀態（僅在對戰中且非輸入框時攔截）
+    // 預填預設暱稱與網址房號
+    inputNickname.value = `挑戰者${Math.floor(10 + Math.random() * 89)}`;
+    const urlParams = new URLSearchParams(window.location.search);
+    const initialRoomParam = (urlParams.get('room') || '').trim().toUpperCase();
+    if (initialRoomParam) {
+      inputRoomCode.value = initialRoomParam;
+    }
+
+    // 鍵盤狀態
     const keys = new Set();
     function isTypingInField(e) {
       const path = typeof e.composedPath === 'function' ? e.composedPath() : [e.target];
@@ -261,9 +325,9 @@
 
     function clearAllKeys() {
       keys.clear();
-      if (appMode === 'online' && window.Playroom && lastInputSent !== '0|0|0|false') {
+      if (appMode === 'online' && roomCode && lastInputSent !== '0|0|0|false') {
         lastInputSent = '0|0|0|false';
-        window.Playroom.myPlayer()?.setState('input', { dx: 0, dy: 0, turn: 0, firing: false });
+        set(ref(db, `rooms/${roomCode}/inputs/${myPlayerId}`), { dx: 0, dy: 0, turn: 0, firing: false }).catch(() => {});
       }
     }
 
@@ -281,16 +345,20 @@
       keys.add(e.code);
 
       if (!e.repeat && EMOJI_MAP[e.code]) {
-        const myId = appMode === 'practice' ? 'local' : window.Playroom?.myPlayer()?.id;
+        const myId = appMode === 'practice' ? 'local' : myPlayerId;
         const me = world.players.find((p) => p.id === myId);
         if (me && !me.alive && performance.now() - lastEmojiSentAt > 300) {
           lastEmojiSentAt = performance.now();
           const symbol = EMOJI_MAP[e.code];
           if (appMode === 'practice') {
             spawnFloatingEmoji(symbol, me.name);
-          } else if (window.Playroom) {
+          } else if (roomCode) {
             myEmojiSeq += 1;
-            window.Playroom.myPlayer().setState('emojiEvent', { symbol, name: me.name, seq: myEmojiSeq }, true);
+            set(ref(db, `rooms/${roomCode}/emojis/${myPlayerId}`), {
+              symbol,
+              name: me.name,
+              seq: myEmojiSeq
+            }).catch(() => {});
           }
         }
       }
@@ -308,7 +376,7 @@
       });
     }
 
-    // 建立初始世界（採用 Fisher-Yates 洗牌，確保 6 人盲盒盡量不重複）
+    // 建立初始世界（Fisher-Yates 洗牌）
     function createInitialWorld(participants) {
       const charPool = shuffle(getSafeCharList());
       const atkPool = shuffle(getSafeAttackPool());
@@ -363,16 +431,15 @@
       };
     }
 
-    // 主引擎模擬步進（僅 Host 或練習模式執行）
+    // 主引擎模擬步進
     function stepWorld(dtMs) {
       if (!world || world.phase !== 'playing') return;
       const dtSec = dtMs / 1000;
-      const stepScale = dtMs / (1000 / 60); // 鎖定 60FPS 物理基準（支援 120Hz 螢幕）
+      const stepScale = dtMs / (1000 / 60);
       world.elapsedSec += dtSec;
       world.tick += 1;
       const worldNowMs = world.elapsedSec * 1000;
 
-      // 1. 縮圈計算與數值護欄
       const rawZone = getShrinkZone(world.elapsedSec) || {};
       world.zone = {
         x: round1(clamp(rawZone.x, 100, CANVAS_W - 100, 400)),
@@ -381,7 +448,6 @@
         damagePerSec: clamp(rawZone.damagePerSec, 3, 12, 6)
       };
 
-      // 2. 道具定時生成（安全區內）
       const safeItems = Array.isArray(itemsConfig) && itemsConfig.length > 0 ? itemsConfig : [{ type: 'HEAL' }];
       if (world.elapsedSec >= world.nextItemAt && world.items.length < 4) {
         world.nextItemAt = world.elapsedSec + ITEM_SPAWN_INTERVAL;
@@ -395,24 +461,18 @@
         });
       }
 
-      // 3. 處理玩家移動、瞄準、開火與圈外扣血
       for (const p of world.players) {
         if (!p.alive) continue;
-
         if (worldNowMs > p.speedUntilMs) p.speedMult = 1;
         p.isShielded = worldNowMs < p.shieldUntilMs;
 
-        let dx = 0;
-        let dy = 0;
-        let turn = 0;
-        let firing = false;
-
+        let dx = 0, dy = 0, turn = 0, firing = false;
         if (p.isBot) {
           p.angle += 0.015 * stepScale;
         } else {
           const inp = appMode === 'practice'
             ? readLocalInput()
-            : (playroomPlayers.find((pp) => pp.id === p.id)?.getState('input') || {});
+            : (p.id === myPlayerId ? readLocalInput() : (remoteInputs[p.id] || {}));
           dx = clamp(inp.dx, -1, 1, 0);
           dy = clamp(inp.dy, -1, 1, 0);
           turn = clamp(inp.turn, -1, 1, 0);
@@ -427,7 +487,6 @@
         }
         p.angle = p.angle + turn * 0.075 * stepScale;
 
-        // 開火與數值護欄（唯讀快照 + hitRadius <= visualRadius 鐵則）
         if (firing) {
           const atk = findAttackMeta(p.attackId, p.isSpecialAttack);
           if (worldNowMs - p.lastFireAtMs >= atk.cooldown) {
@@ -451,7 +510,6 @@
               shotTotalDamage += dmg;
               shotBulletCount += 1;
 
-              // 限制子彈生成點不可瞬移至距離射手超過 60px
               const rawBx = safeNum(b.x, p.x);
               const rawBy = safeNum(b.y, p.y);
               const offX = rawBx - p.x;
@@ -460,7 +518,6 @@
               const bx = offDist > 60 ? p.x + (offX / offDist) * 60 : rawBx;
               const by = offDist > 60 ? p.y + (offY / offDist) * 60 : rawBy;
 
-              // 大型特殊武器速度依半徑微幅限制
               const maxSpd = visualRadius > 20 ? 7 : 14;
               world.bullets.push({
                 ownerId: p.id,
@@ -483,7 +540,6 @@
           }
         }
 
-        // 圈外扣血
         const distToZone = Math.hypot(p.x - world.zone.x, p.y - world.zone.y);
         if (distToZone > world.zone.radius && !p.isShielded) {
           p.preDeathHp = p.hp;
@@ -492,7 +548,6 @@
         }
       }
 
-      // 4. 更新子彈與碰撞判定
       const nextBullets = [];
       for (const b of world.bullets) {
         b.x = round1(b.x + b.vx * stepScale);
@@ -517,7 +572,6 @@
       }
       world.bullets = nextBullets;
 
-      // 5. 道具碰撞拾取與護欄
       const nextItems = [];
       for (const it of world.items) {
         let picked = false;
@@ -544,7 +598,6 @@
       }
       world.items = nextItems;
 
-      // 6. 大逃殺勝負判定（支援同幀死亡排序與並列名次）
       const alivePlayers = world.players.filter((p) => p.alive);
       if (alivePlayers.length <= 1) {
         world.phase = 'gameover';
@@ -593,16 +646,14 @@
       return { dx, dy, turn, firing };
     }
 
-    // 畫面渲染（每台筆電本機執行）
     function render(dtMs) {
       drawArenaBackground(ctx, CANVAS_W, CANVAS_H);
       if (!world) return;
 
       drawDangerZone(ctx, world.zone, CANVAS_W, CANVAS_H);
+      for (const it of (world.items || [])) drawItem(ctx, it);
 
-      for (const it of world.items) drawItem(ctx, it);
-
-      for (const p of world.players) {
+      for (const p of (world.players || [])) {
         if (!p.alive) continue;
         drawCharacter(ctx, p);
         ctx.save();
@@ -617,12 +668,11 @@
         ctx.restore();
       }
 
-      for (const b of world.bullets) {
+      for (const b of (world.bullets || [])) {
         if (b.isSpecial) drawSpecialProjectile(ctx, b);
         else drawNormalProjectile(ctx, b);
       }
 
-      // 飄浮加油表情（時間步長無關）
       localEmojis = localEmojis.filter((em) => {
         em.y += em.vy * (dtMs / 16.67);
         em.life -= dtMs;
@@ -639,15 +689,15 @@
         return true;
       });
 
-      const myId = appMode === 'practice' ? 'local' : window.Playroom?.myPlayer()?.id;
-      const me = world.players.find((p) => p.id === myId);
-      const aliveCount = world.players.filter((p) => p.alive).length;
+      const myId = appMode === 'practice' ? 'local' : myPlayerId;
+      const me = (world.players || []).find((p) => p.id === myId);
+      const aliveCount = (world.players || []).filter((p) => p.alive).length;
 
       drawHUD(ctx, {
         mode: appMode,
         elapsedSec: world.elapsedSec,
         aliveCount,
-        totalCount: world.players.length,
+        totalCount: (world.players || []).length,
         me
       });
 
@@ -655,14 +705,13 @@
         drawSpectatorOverlay(ctx, { aliveCount, floatingEmojis: localEmojis });
       }
       if (world.phase === 'gameover') {
-        drawGameOverScreen(ctx, world.ranking);
-        if (appMode === 'online' && window.Playroom?.isHost()) {
+        drawGameOverScreen(ctx, world.ranking || []);
+        if (appMode === 'online' && isRoomHost) {
           btnOnlineRestart.classList.remove('hidden');
         }
       }
     }
 
-    // 建立輕量化網路同步快照（移除純 Host 欄位）
     function buildCompactWorld(w) {
       return {
         matchId: w.matchId,
@@ -691,56 +740,31 @@
 
       if (appMode === 'practice') {
         stepWorld(dtMs);
-      } else if (appMode === 'online' && window.Playroom) {
-        const myP = window.Playroom.myPlayer();
-        const me = world?.players?.find((p) => p.id === myP?.id);
-        if (myP && world?.phase === 'playing' && me?.alive) {
+      } else if (appMode === 'online' && roomCode) {
+        const me = world?.players?.find((p) => p.id === myPlayerId);
+        if (!isRoomHost && world?.phase === 'playing' && me?.alive) {
           const inp = readLocalInput();
           const sig = `${inp.dx}|${inp.dy}|${inp.turn}|${inp.firing}`;
-          if (sig !== lastInputSent || now - lastInputSentAt > 100) {
+          if (sig !== lastInputSent || now - lastInputSentAt > 120) {
             lastInputSent = sig;
             lastInputSentAt = now;
-            myP.setState('input', inp);
+            set(ref(db, `rooms/${roomCode}/inputs/${myPlayerId}`), inp).catch(() => {});
           }
         }
 
-        // 同步各玩家加油表情
-        for (const pp of playroomPlayers) {
-          const ev = pp.getState('emojiEvent');
-          if (ev && ev.seq && ev.seq !== lastEmojiSyncMap.get(pp.id)) {
-            lastEmojiSyncMap.set(pp.id, ev.seq);
-            spawnFloatingEmoji(ev.symbol, ev.name || '玩家');
-          }
-        }
-
-        if (window.Playroom.isHost()) {
-          if (world) {
-            if (world.phase === 'playing') {
-              stepWorld(dtMs);
-              if (world.phase === 'gameover') {
-                gameoverSynced = true;
-                window.Playroom.setState('world', buildCompactWorld(world), true);
-              } else if (now - lastWorldSyncAt >= SYNC_INTERVAL_MS) {
-                lastWorldSyncAt = now;
-                window.Playroom.setState('world', buildCompactWorld(world));
-              }
-            } else if (!gameoverSynced) {
+        if (isRoomHost && world) {
+          if (world.phase === 'playing') {
+            stepWorld(dtMs);
+            if (world.phase === 'gameover') {
               gameoverSynced = true;
-              window.Playroom.setState('world', buildCompactWorld(world), true);
+              set(ref(db, `rooms/${roomCode}/world`), buildCompactWorld(world)).catch(() => {});
+            } else if (now - lastWorldSyncAt >= SYNC_INTERVAL_MS) {
+              lastWorldSyncAt = now;
+              set(ref(db, `rooms/${roomCode}/world`), buildCompactWorld(world)).catch(() => {});
             }
-          }
-        } else {
-          const synced = window.Playroom.getState('world');
-          if (synced) {
-            const isNewMatch = synced.matchId !== lastObservedMatchId;
-            if (isNewMatch || !world || synced.tick >= world.tick) {
-              if (isNewMatch) {
-                lastObservedMatchId = synced.matchId;
-                localEmojis = [];
-                btnOnlineRestart.classList.add('hidden');
-              }
-              world = synced;
-            }
+          } else if (!gameoverSynced) {
+            gameoverSynced = true;
+            set(ref(db, `rooms/${roomCode}/world`), buildCompactWorld(world)).catch(() => {});
           }
         }
       }
@@ -749,12 +773,13 @@
       if (loopRunning) requestAnimationFrame(gameLoop);
     }
 
-    // 啟動練習模式
+    // 練習模式
     function startPractice() {
       appMode = 'practice';
       keys.clear();
       localEmojis = [];
       menuOverlay.classList.add('hidden');
+      roomSetupOverlay.classList.add('hidden');
       lobbyOverlay.classList.add('hidden');
       btnReroll.classList.remove('hidden');
       btnOnlineRestart.classList.add('hidden');
@@ -773,146 +798,215 @@
       }
     }
 
-    // 啟動 6 人連線模式
-    async function startOnline() {
-      if (onlineStarting) return;
-      if (!window.Playroom) {
-        alert('Playroom SDK 尚未載入完成，請確認網路連線。');
-        return;
-      }
-      onlineStarting = true;
-      btnOnline.disabled = true;
-      btnPractice.disabled = true;
+    // 連線模式入口
+    function openRoomSetup() {
       appMode = 'online';
+      menuOverlay.classList.add('hidden');
+      roomSetupOverlay.classList.remove('hidden');
+      btnBackMenu.classList.remove('hidden');
+      roomErrorMsg.textContent = '';
+    }
+
+    async function enterFirebaseRoom(code, createAsHost) {
+      const nick = (inputNickname.value || '').trim() || `玩家${Math.floor(10 + Math.random() * 89)}`;
+      roomErrorMsg.textContent = '';
+      btnCreateRoom.disabled = true;
+      btnJoinRoom.disabled = true;
 
       try {
-        const coinOpts = { skipLobby: false, maxPlayersPerRoom: 6 };
-        const urlGameId = new URLSearchParams(window.location.search).get('gameId') || PLAYROOM_GAME_ID;
-        if (urlGameId) coinOpts.gameId = urlGameId;
-        await window.Playroom.insertCoin(coinOpts);
-      } catch (err) {
-        onlineStarting = false;
-        appMode = null;
-        btnOnline.disabled = false;
-        btnPractice.disabled = false;
-        // 移除 Playroom 注入的配額／滿房遮罩，避免鎖死主選單與練習模式
-        document.getElementById('full-room-popup')?.remove();
-        lobbyOverlay.classList.add('hidden');
-        menuOverlay.classList.remove('hidden');
-        btnBackMenu.classList.add('hidden');
-        const msg = String(err?.message || err || '');
-        if (msg.includes('QUOTA_EXCEEDED')) {
-          alert('Playroom 預設共用連線配額已達今日上限（QUOTA_EXCEEDED）。\n請教師於 dev.joinplayroom.com 取得免費專屬 gameId 填入 index.html，或先使用「練習模式」！');
-        } else {
-          alert(`無法加入房間（可能已滿 6 人或連線取消）：${msg}`);
-        }
-        return;
-      }
+        const roomSnap = await get(ref(db, `rooms/${code}`));
+        const roomData = roomSnap.val();
 
-      menuOverlay.classList.add('hidden');
-      lobbyOverlay.classList.remove('hidden');
-      btnBackMenu.classList.remove('hidden');
-
-      // 紀錄進入大廳時若已有舊局 matchId，則忽略該舊局結算狀態
-      const existingWorld = window.Playroom.getState('world');
-      const staleMatchId = existingWorld?.phase === 'gameover' ? existingWorld.matchId : null;
-
-      if (!joinListenerBound) {
-        joinListenerBound = true;
-        window.Playroom.onPlayerJoin((player) => {
-          const idx = playroomPlayers.findIndex((p) => p.id === player.id);
-          if (idx >= 0) playroomPlayers[idx] = player;
-          else playroomPlayers.push(player);
-
-          // 同步已有表情序號避免新進時噴發舊表情
-          const existingEv = player.getState('emojiEvent');
-          if (existingEv?.seq) lastEmojiSyncMap.set(player.id, existingEv.seq);
-
-          updateLobbyUI();
-          player.onQuit(() => {
-            playroomPlayers = playroomPlayers.filter((p) => p.id !== player.id);
-            lastEmojiSyncMap.delete(player.id);
-            if (world?.phase === 'playing' && window.Playroom?.isHost()) {
-              const target = world.players.find((wp) => wp.id === player.id);
-              if (target && target.alive) eliminatePlayer(target, null);
-            }
-            updateLobbyUI();
+        if (createAsHost) {
+          isRoomHost = true;
+          roomHostId = myPlayerId;
+          await set(ref(db, `rooms/${code}`), {
+            hostId: myPlayerId,
+            createdAt: Date.now()
           });
-        });
-      }
-
-      const waitLobby = () => {
-        if (appMode !== 'online') return;
-        const synced = window.Playroom.getState('world');
-        if (synced && synced.phase === 'playing' && synced.matchId !== staleMatchId) {
-          keys.clear();
-          localEmojis = [];
-          lastObservedMatchId = synced.matchId;
-          world = synced;
-          lobbyOverlay.classList.add('hidden');
-          if (!loopRunning) {
-            loopRunning = true;
-            lastFrameTime = performance.now();
-            requestAnimationFrame(gameLoop);
+        } else {
+          if (!roomData || !roomData.hostId) {
+            roomErrorMsg.textContent = `找不到房號「${code}」，請確認房號是否正確！`;
+            return;
           }
-          return;
+          const currentPlayers = roomData.players ? Object.values(roomData.players) : [];
+          if (currentPlayers.length >= 6) {
+            roomErrorMsg.textContent = `房間「${code}」已滿 6 人，無法再加入！`;
+            return;
+          }
+          isRoomHost = false;
+          roomHostId = roomData.hostId;
+        }
+
+        roomCode = code;
+        const myPlayerRef = ref(db, `rooms/${code}/players/${myPlayerId}`);
+        await onDisconnect(myPlayerRef).remove();
+        await set(myPlayerRef, { id: myPlayerId, name: nick, joinedAt: Date.now() });
+
+        if (!isRoomHost) {
+          await onDisconnect(ref(db, `rooms/${code}/inputs/${myPlayerId}`)).remove();
+        }
+
+        // 更新網址方便複製分享
+        history.replaceState(null, '', `${window.location.pathname}?room=${code}`);
+        lobbyRoomCodeEl.textContent = code;
+        roomSetupOverlay.classList.add('hidden');
+        lobbyOverlay.classList.remove('hidden');
+
+        staleMatchId = roomData?.world?.phase === 'gameover' ? roomData.world.matchId : null;
+        bindRoomListeners(code);
+      } catch (err) {
+        roomErrorMsg.textContent = `連線 Firebase 失敗：${err?.message || err}`;
+      } finally {
+        btnCreateRoom.disabled = false;
+        btnJoinRoom.disabled = false;
+      }
+    }
+
+    function bindRoomListeners(code) {
+      unsubscribers.forEach((u) => u());
+      unsubscribers = [];
+
+      // 1. 監聽房間玩家清單（滿 6 人解鎖）
+      unsubscribers.push(onValue(ref(db, `rooms/${code}/players`), (snap) => {
+        const val = snap.val() || {};
+        roomPlayers = Object.values(val).sort((a, b) => (a.joinedAt || 0) - (b.joinedAt || 0));
+        // 若對戰中有人斷線，由 Host 淘汰
+        if (isRoomHost && world?.phase === 'playing') {
+          const activeIds = new Set(roomPlayers.map((rp) => rp.id));
+          for (const wp of world.players) {
+            if (wp.alive && !activeIds.has(wp.id)) eliminatePlayer(wp, null);
+          }
         }
         updateLobbyUI();
-        requestAnimationFrame(waitLobby);
-      };
-      requestAnimationFrame(waitLobby);
+      }));
+
+      // 2. 房主監聽所有玩家輸入
+      if (isRoomHost) {
+        unsubscribers.push(onValue(ref(db, `rooms/${code}/inputs`), (snap) => {
+          remoteInputs = snap.val() || {};
+        }));
+      } else {
+        // 3. 非房主監聽 Host 廣播的世界狀態
+        unsubscribers.push(onValue(ref(db, `rooms/${code}/world`), (snap) => {
+          const synced = snap.val();
+          if (!synced || !synced.phase) return;
+          if (synced.matchId === staleMatchId) return;
+
+          const isNewMatch = synced.matchId !== lastObservedMatchId;
+          if (isNewMatch || !world || synced.tick >= world.tick) {
+            if (isNewMatch) {
+              lastObservedMatchId = synced.matchId;
+              keys.clear();
+              localEmojis = [];
+              btnOnlineRestart.classList.add('hidden');
+              lobbyOverlay.classList.add('hidden');
+              if (!loopRunning) {
+                loopRunning = true;
+                lastFrameTime = performance.now();
+                requestAnimationFrame(gameLoop);
+              }
+            }
+            world = synced;
+          }
+        }));
+      }
+
+      // 4. 所有人監聽觀戰加油表情
+      unsubscribers.push(onValue(ref(db, `rooms/${code}/emojis`), (snap) => {
+        const map = snap.val() || {};
+        for (const [pid, ev] of Object.entries(map)) {
+          if (ev && ev.seq && ev.seq !== lastEmojiSyncMap.get(pid)) {
+            lastEmojiSyncMap.set(pid, ev.seq);
+            spawnFloatingEmoji(ev.symbol, ev.name || '玩家');
+          }
+        }
+      }));
     }
 
     function updateLobbyUI() {
-      const count = playroomPlayers.length;
-      const isHost = Boolean(window.Playroom?.isHost());
-      const names = playroomPlayers.map((p, i) => p.getProfile()?.name || `神秘挑戰者${i + 1}`);
-      const snap = `${count}|${isHost}|${names.join(',')}`;
-      if (snap === lastLobbySnapshot) return;
-      lastLobbySnapshot = snap;
-
+      const count = roomPlayers.length;
       lobbyTitle.textContent = `🌐 等待玩家加入中... (${count} / 6)`;
       lobbyPlayersEl.innerHTML = '';
-      names.forEach((name, i) => {
+      roomPlayers.forEach((p, i) => {
         const chip = document.createElement('span');
-        chip.className = 'chip';
-        chip.textContent = `玩家 ${i + 1}: ${name}`;
+        const isHostChip = p.id === roomHostId;
+        chip.className = isHostChip ? 'chip chip-host' : 'chip';
+        chip.textContent = `玩家 ${i + 1}: ${p.name}${isHostChip ? ' (房主)' : ''}`;
         lobbyPlayersEl.appendChild(chip);
       });
 
       const full = count >= 6;
-      btnStartOnline.disabled = !(isHost && full);
+      btnStartOnline.disabled = !(isRoomHost && full);
       if (!full) btnStartOnline.textContent = `還差 ${6 - count} 位玩家才能開始...`;
-      else if (!isHost) btnStartOnline.textContent = '已滿 6 人！等待房主點擊開始...';
+      else if (!isRoomHost) btnStartOnline.textContent = '已滿 6 人！等待房主點擊開始...';
       else btnStartOnline.textContent = '🚀 6 人已到齊！啟動盲盒大逃殺';
     }
 
-    function launchOnlineMatch() {
-      if (!window.Playroom?.isHost() || playroomPlayers.length < 6) return;
+    async function launchOnlineMatch() {
+      if (!isRoomHost || roomPlayers.length < 6) return;
       btnStartOnline.disabled = true;
       btnOnlineRestart.classList.add('hidden');
       keys.clear();
       localEmojis = [];
+      lastEmojiSyncMap.clear();
       gameoverSynced = false;
-      const participants = playroomPlayers.slice(0, 6).map((p, idx) => ({
+
+      await set(ref(db, `rooms/${roomCode}/emojis`), null).catch(() => {});
+      const participants = roomPlayers.slice(0, 6).map((p, idx) => ({
         id: p.id,
-        name: p.getProfile()?.name || `玩家${idx + 1}`,
+        name: p.name || `玩家${idx + 1}`,
         isBot: false
       }));
       world = createInitialWorld(participants);
       lastObservedMatchId = world.matchId;
-      window.Playroom.setState('world', buildCompactWorld(world), true);
+      lobbyOverlay.classList.add('hidden');
+      await set(ref(db, `rooms/${roomCode}/world`), buildCompactWorld(world));
+
+      if (!loopRunning) {
+        loopRunning = true;
+        lastFrameTime = performance.now();
+        requestAnimationFrame(gameLoop);
+      }
     }
 
-    btnStartOnline.addEventListener('click', () => {
-      if (!world) launchOnlineMatch();
+    btnCreateRoom.addEventListener('click', () => {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let code = '';
+      for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+      enterFirebaseRoom(code, true);
     });
+
+    btnJoinRoom.addEventListener('click', () => {
+      const code = (inputRoomCode.value || '').trim().toUpperCase();
+      if (!code) {
+        roomErrorMsg.textContent = '請輸入房號！';
+        return;
+      }
+      enterFirebaseRoom(code, false);
+    });
+
+    btnCopyInvite.addEventListener('click', async () => {
+      const url = `${window.location.origin}${window.location.pathname}?room=${roomCode}`;
+      try {
+        await navigator.clipboard.writeText(url);
+        btnCopyInvite.textContent = '✅ 已複製連結';
+        setTimeout(() => { btnCopyInvite.textContent = '📋 複製邀請連結'; }, 1800);
+      } catch {
+        prompt('請複製此邀請連結分享給同學：', url);
+      }
+    });
+
+    btnStartOnline.addEventListener('click', launchOnlineMatch);
     btnOnlineRestart.addEventListener('click', launchOnlineMatch);
-    btnPractice.addEventListener('click', startPractice);
-    btnOnline.addEventListener('click', startOnline);
+    document.getElementById('btnPractice').addEventListener('click', startPractice);
+    document.getElementById('btnOnline').addEventListener('click', openRoomSetup);
     btnReroll.addEventListener('click', startPractice);
-    btnBackMenu.addEventListener('click', () => {
-      history.replaceState(null, '', window.location.pathname + window.location.search);
+    btnBackMenu.addEventListener('click', async () => {
+      if (roomCode) {
+        await remove(ref(db, `rooms/${roomCode}/players/${myPlayerId}`)).catch(() => {});
+      }
+      history.replaceState(null, '', window.location.pathname);
       window.location.reload();
     });
   </script>
