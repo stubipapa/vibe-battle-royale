@@ -1,14 +1,13 @@
 /**
  * 模組 3：特殊攻擊形式師（學生 3 負責，負責 attackId: 3, 4, 5）
  * --------------------------------------------------
- * 目前為「粗糙橘色中方塊」樣板，請使用 Antigravity 改造成超慢巨型西瓜、迴力尺、定時墨水等！
- * 鐵則：hitRadius <= visualRadius（上限 36px）、單發傷害 <= 45、冷卻 800~2500ms。
+ * [演練暴力測試版] 實作巨型西瓜 / 旋轉直尺 / 墨水球，故意填入違規數值測試審查。
  */
 
 export const specialAttacks = [
-  { id: 3, name: '慢速橘方塊', cooldown: 1100, color: '#fb923c' },
-  { id: 4, name: '重型橘方塊', cooldown: 1500, color: '#f97316' },
-  { id: 5, name: '長程橘方塊', cooldown: 1300, color: '#ea580c' }
+  { id: 3, name: '巨型西瓜', cooldown: 1200, color: '#22c55e' },
+  { id: 4, name: '旋轉直尺', cooldown: 1400, color: '#facc15' },
+  { id: 5, name: '墨水球', cooldown: 1100, color: '#1e293b' }
 ];
 
 /**
@@ -18,36 +17,122 @@ export const specialAttacks = [
  * @param {function} spawnBullet - 呼叫 spawnBullet(bulletConfig) 生成子彈
  */
 export function onFireSpecial(attackId, shooter, spawnBullet) {
-  const speed = attackId === 4 ? 3.0 : 4.2;
-  const radius = attackId === 4 ? 14 : 10;
-  const damage = attackId === 4 ? 32 : 24;
+  const cos = Math.cos(shooter.angle);
+  const sin = Math.sin(shooter.angle);
+  const spawnX = shooter.x + cos * 28;
+  const spawnY = shooter.y + sin * 28;
+
+  if (attackId === 3) {
+    // 故意違規測試：damage: 999、visualRadius: 60、hitRadius: 60
+    spawnBullet({
+      x: spawnX,
+      y: spawnY,
+      vx: cos * 2.4,
+      vy: sin * 2.4,
+      damage: 999,
+      lifeTime: 3000,
+      visualRadius: 60,
+      hitRadius: 60,
+      color: '#22c55e',
+      style: 'watermelon'
+    });
+    return;
+  }
+
+  if (attackId === 4) {
+    spawnBullet({
+      x: spawnX,
+      y: spawnY,
+      vx: cos * 4.5,
+      vy: sin * 4.5,
+      damage: 999,
+      lifeTime: 2400,
+      visualRadius: 60,
+      hitRadius: 60,
+      color: '#facc15',
+      style: 'ruler'
+    });
+    return;
+  }
 
   spawnBullet({
-    x: shooter.x + Math.cos(shooter.angle) * 26,
-    y: shooter.y + Math.sin(shooter.angle) * 26,
-    vx: Math.cos(shooter.angle) * speed,
-    vy: Math.sin(shooter.angle) * speed,
-    damage,
+    x: spawnX,
+    y: spawnY,
+    vx: cos * 3.8,
+    vy: sin * 3.8,
+    damage: 999,
     lifeTime: 2600,
-    visualRadius: radius,
-    hitRadius: radius,
-    color: '#fb923c',
-    style: 'special-rect'
+    visualRadius: 60,
+    hitRadius: 60,
+    color: '#0f172a',
+    style: 'inkball'
   });
 }
 
 /**
- * 繪製特殊攻擊子彈外觀（目前為粗糙橘色中方塊）
+ * 繪製特殊攻擊子彈外觀（巨型西瓜 / 旋轉直尺 / 墨水球）
  * @param {CanvasRenderingContext2D} ctx
  * @param {object} bullet
  */
 export function drawSpecialProjectile(ctx, bullet) {
-  const r = bullet.visualRadius || 10;
+  const r = bullet.visualRadius || 24;
+  const t = performance.now() * 0.008;
+
   ctx.save();
-  ctx.fillStyle = bullet.color || '#fb923c';
-  ctx.fillRect(bullet.x - r, bullet.y - r, r * 2, r * 2);
-  ctx.strokeStyle = '#ffedd5';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(bullet.x - r, bullet.y - r, r * 2, r * 2);
+  ctx.translate(bullet.x, bullet.y);
+
+  if (bullet.style === 'watermelon') {
+    ctx.rotate(t * 0.6);
+    ctx.fillStyle = '#16a34a';
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = '#14532d';
+    ctx.lineWidth = Math.max(2, r * 0.14);
+    for (let i = -1; i <= 1; i++) {
+      ctx.beginPath();
+      ctx.arc(i * r * 0.3, 0, r * 0.65, -Math.PI * 0.4, Math.PI * 0.4);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = '#bbf7d0';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.stroke();
+  } else if (bullet.style === 'ruler') {
+    ctx.rotate(t * 1.8);
+    const w = r * 1.9;
+    const h = r * 0.45;
+    ctx.fillStyle = '#facc15';
+    ctx.fillRect(-w / 2, -h / 2, w, h);
+    ctx.strokeStyle = '#854d0e';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(-w / 2, -h / 2, w, h);
+    ctx.beginPath();
+    for (let x = -w / 2 + 6; x < w / 2 - 4; x += 6) {
+      ctx.moveTo(x, -h / 2);
+      ctx.lineTo(x, -h / 2 + h * 0.45);
+    }
+    ctx.stroke();
+  } else {
+    const pulse = 1 + Math.sin(t * 1.5) * 0.12;
+    ctx.fillStyle = 'rgba(30, 41, 59, 0.35)';
+    ctx.beginPath();
+    ctx.arc(0, 0, r * pulse, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#0f172a';
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.72, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * pulse, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
   ctx.restore();
 }
