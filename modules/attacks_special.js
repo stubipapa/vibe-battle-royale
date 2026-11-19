@@ -1,14 +1,21 @@
 /**
  * 模組 3：特殊攻擊形式師（學生 3 負責，負責 attackId: 3, 4, 5）
  * --------------------------------------------------
- * [演練暴力測試版] 實作巨型西瓜 / 旋轉直尺 / 墨水球，故意填入違規數值測試審查。
+ * 實作三種特殊攻擊：巨型西瓜、旋轉直尺、墨水球。
+ * 鐵則：hitRadius <= visualRadius（上限 36px）、單發傷害 <= 45、冷卻 800~2500ms。
  */
 
 export const specialAttacks = [
-  { id: 3, name: '巨型西瓜', cooldown: 1200, color: '#22c55e' },
-  { id: 4, name: '旋轉直尺', cooldown: 1400, color: '#facc15' },
+  { id: 3, name: '巨型西瓜', cooldown: 1600, color: '#22c55e' },
+  { id: 4, name: '旋轉直尺', cooldown: 1300, color: '#facc15' },
   { id: 5, name: '墨水球', cooldown: 1100, color: '#1e293b' }
 ];
+
+const SPECIAL_SPECS = {
+  3: { speed: 2.2, damage: 42, lifeTime: 2800, visualRadius: 32, hitRadius: 30, color: '#22c55e', style: 'watermelon' },
+  4: { speed: 4.0, damage: 34, lifeTime: 2200, visualRadius: 20, hitRadius: 18, color: '#facc15', style: 'ruler' },
+  5: { speed: 3.5, damage: 30, lifeTime: 2500, visualRadius: 24, hitRadius: 24, color: '#1e293b', style: 'inkball' }
+};
 
 /**
  * 觸發特殊攻擊開火
@@ -17,55 +24,21 @@ export const specialAttacks = [
  * @param {function} spawnBullet - 呼叫 spawnBullet(bulletConfig) 生成子彈
  */
 export function onFireSpecial(attackId, shooter, spawnBullet) {
+  const spec = SPECIAL_SPECS[attackId] || SPECIAL_SPECS[5];
   const cos = Math.cos(shooter.angle);
   const sin = Math.sin(shooter.angle);
-  const spawnX = shooter.x + cos * 28;
-  const spawnY = shooter.y + sin * 28;
-
-  if (attackId === 3) {
-    // 故意違規測試：damage: 999、visualRadius: 60、hitRadius: 60
-    spawnBullet({
-      x: spawnX,
-      y: spawnY,
-      vx: cos * 2.4,
-      vy: sin * 2.4,
-      damage: 999,
-      lifeTime: 3000,
-      visualRadius: 60,
-      hitRadius: 60,
-      color: '#22c55e',
-      style: 'watermelon'
-    });
-    return;
-  }
-
-  if (attackId === 4) {
-    spawnBullet({
-      x: spawnX,
-      y: spawnY,
-      vx: cos * 4.5,
-      vy: sin * 4.5,
-      damage: 999,
-      lifeTime: 2400,
-      visualRadius: 60,
-      hitRadius: 60,
-      color: '#facc15',
-      style: 'ruler'
-    });
-    return;
-  }
 
   spawnBullet({
-    x: spawnX,
-    y: spawnY,
-    vx: cos * 3.8,
-    vy: sin * 3.8,
-    damage: 999,
-    lifeTime: 2600,
-    visualRadius: 60,
-    hitRadius: 60,
-    color: '#0f172a',
-    style: 'inkball'
+    x: shooter.x + cos * 28,
+    y: shooter.y + sin * 28,
+    vx: cos * spec.speed,
+    vy: sin * spec.speed,
+    damage: spec.damage,
+    lifeTime: spec.lifeTime,
+    visualRadius: spec.visualRadius,
+    hitRadius: spec.hitRadius,
+    color: spec.color,
+    style: spec.style
   });
 }
 
