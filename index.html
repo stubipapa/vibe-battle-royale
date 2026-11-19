@@ -315,6 +315,7 @@
 
     // 鍵盤狀態
     const keys = new Set();
+    let pendingFire = false;
     function isTypingInField(e) {
       const path = typeof e.composedPath === 'function' ? e.composedPath() : [e.target];
       return path.some((el) =>
@@ -325,6 +326,7 @@
 
     function clearAllKeys() {
       keys.clear();
+      pendingFire = false;
       if (appMode === 'online' && roomCode && lastInputSent !== '0|0|0|false') {
         lastInputSent = '0|0|0|false';
         set(ref(db, `rooms/${roomCode}/inputs/${myPlayerId}`), { dx: 0, dy: 0, turn: 0, firing: false }).catch(() => {});
@@ -343,6 +345,7 @@
         e.preventDefault();
       }
       keys.add(e.code);
+      if (e.code === 'Space') pendingFire = true;
 
       if (!e.repeat && EMOJI_MAP[e.code]) {
         const myId = appMode === 'practice' ? 'local' : myPlayerId;
@@ -482,8 +485,8 @@
         const spd = p.baseSpeed * p.speedMult * stepScale;
         const len = Math.hypot(dx, dy) || 1;
         if (dx !== 0 || dy !== 0) {
-          p.x = round1(clamp(p.x + (dx / len) * spd, PLAYER_RADIUS, CANVAS_W - PLAYER_RADIUS, p.x));
-          p.y = round1(clamp(p.y + (dy / len) * spd, PLAYER_RADIUS, CANVAS_H - PLAYER_RADIUS, p.y));
+          p.x = round1(clamp(p.x + (dx / len) * spd, PLAYER_RADIUS + 2, CANVAS_W - PLAYER_RADIUS - 2, p.x));
+          p.y = round1(clamp(p.y + (dy / len) * spd, PLAYER_RADIUS + 2, CANVAS_H - PLAYER_RADIUS - 2, p.y));
         }
         p.angle = p.angle + turn * 0.075 * stepScale;
 
@@ -642,7 +645,8 @@
       const dx = (keys.has('ArrowRight') ? 1 : 0) - (keys.has('ArrowLeft') ? 1 : 0);
       const dy = (keys.has('ArrowDown') ? 1 : 0) - (keys.has('ArrowUp') ? 1 : 0);
       const turn = (keys.has('KeyX') ? 1 : 0) - (keys.has('KeyZ') ? 1 : 0);
-      const firing = keys.has('Space');
+      const firing = keys.has('Space') || pendingFire;
+      pendingFire = false;
       return { dx, dy, turn, firing };
     }
 
@@ -809,7 +813,8 @@
 
     async function enterFirebaseRoom(code, createAsHost) {
       const nick = (inputNickname.value || '').trim() || `玩家${Math.floor(10 + Math.random() * 89)}`;
-      roomErrorMsg.textContent = '';
+      roomErrorMsg.style.color = '#38bdf8';
+      roomErrorMsg.textContent = '連線至房間中，請稍候...';
       btnCreateRoom.disabled = true;
       btnJoinRoom.disabled = true;
 
